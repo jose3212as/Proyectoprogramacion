@@ -1,0 +1,25 @@
+id,fecha,hora,comercio,ciudad,canal,monto,moneda,tipo
+TX001,2026-10-01,08:15,Cafe Tostado Ica,Ica,presencial,11.50,PEN,compra
+TX002,2026-10-01,13:20,Menu Criollo El Sol,Ica,presencial,24.00,PEN,compra
+TX003,2026-10-02,07:50,Colectivo Ica Centro,Ica,presencial,6.00,PEN,compra
+TX004,2026-10-02,19:10,Netflix.com,Lima,online,44.90,PEN,suscripcion
+TX005,2026-10-03,08:25,Cafe Tostado Ica,Ica,presencial,12.00,PEN,compra
+TX006,2026-10-03,18:40,Botica Inkafarma Ica,Ica,presencial,38.50,PEN,compra
+TX007,2026-10-04,11:15,Supermercado Metro Ica,Ica,presencial,142.50,PEN,compra
+TX008,2026-10-04,11:18,Supermercado Metro Ica,Ica,presencial,142.50,PEN,compra
+TX009,2026-10-05,09:00,Spotify Premium,Estocolmo,online,6.99,USD,suscripcion
+TX010,2026-10-06,08:10,Cafe Tostado Ica,Ica,presencial,11.50,PEN,compra
+TX011,2026-10-07,15:30,Uber Viaje Ica,Ica,online,18.00,PEN,compra
+TX012,2026-10-08,20:05,ElectroLuz Ica,Ica,online,96.00,PEN,servicio
+TX013,2026-10-09,08:30,Cafe Tostado Ica,Ica,presencial,13.00,PEN,compra
+TX014,2026-10-10,12:45,Polleria Las Palmeras,Ica,presencial,58.00,PEN,compra
+TX015,2026-10-11,09:40,Amazon Prime Video,Seattle,online,5.99,USD,suscripcion
+TX016,2026-10-12,08:20,Cafe Tostado Ica,Ica,presencial,11.00,PEN,compra
+TX017,2026-10-12,14:00,Grifo Primax Panamericana,Ica,presencial,85.00,PEN,compra
+TX018,2026-10-12,14:45,Tienda Mall Aventura,Trujillo,presencial,320.00,PEN,compra
+TX019,2026-10-14,17:15,Yape Bodega San Martin,Ica,presencial,14.50,PEN,compra
+TX020,2026-10-15,03:15,TechStore Importaciones,Miami,online,950.00,PEN,compra
+TX021,2026-10-16,08:18,Cafe Tostado Ica,Ica,presencial,12.50,PEN,compra
+TX022,2026-10-17,13:05,Agua Emapica Ica,Ica,online,48.00,PEN,servicio
+TX023,2026-10-18,19:45,Cineplanet El Quinde,Ica,presencial,46.00,PEN,compra
+TX024,2026-10-19,09:10,Netflix.com,Lima,online,44.90,PEN,suscripcion

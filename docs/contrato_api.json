@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FinGuard AuditoriaResponse",
+  "description": "Contrato JSON oficial de respuesta del endpoint POST /api/auditar-cuenta",
+  "ejemplo": {
+    "audit_id": "aud-20261020-001",
+    "archivo": "estado_cuenta_demo.csv",
+    "formato": "csv",
+    "fecha_auditoria": "2026-10-20T10:30:00Z",
+    "perfil": {
+      "ciudad_habitual": "Ica",
+      "modo": "normal",
+      "presupuesto_mensual": 2500.0
+    },
+    "resumen_gastos": {
+      "gasto_total": 2131.65,
+      "promedio_diario": 112.19,
+      "cantidad_movimientos": 24,
+      "presupuesto_consumido_pct": 85.27,
+      "estado_presupuesto": "precaucion",
+      "media_transaccion": 88.82,
+      "desviacion_estandar": 191.45,
+      "por_categoria": [
+        {
+          "categoria": "Compras",
+          "total": 1270.0,
+          "porcentaje": 59.58,
+          "cantidad": 2
+        }
+      ],
+      "gasto_diario": [
+        {
+          "fecha": "2026-10-01",
+          "total": 35.5
+        }
+      ]
+    },
+    "radar_fugas": {
+      "total_fugas_estimado": 302.35,
+      "gastos_hormiga": [
+        {
+          "comercio": "Cafe Tostado Ica",
+          "categoria": "Comida",
+          "cantidad": 6,
+          "monto_promedio": 11.92,
+          "total_acumulado": 71.5,
+          "explicacion": "Se detectaron 6 compras pequenas frecuentes en Cafe Tostado Ica por un total acumulado de S/ 71.50."
+        }
+      ],
+      "cobros_duplicados": [
+        {
+          "ids_transacciones": ["TX007", "TX008"],
+          "comercio": "Supermercado Metro Ica",
+          "monto": 142.5,
+          "fecha": "2026-10-04",
+          "diferencia_minutos": 3,
+          "explicacion": "Cobro duplicado de S/ 142.50 en Supermercado Metro Ica el 2026-10-04 con solo 3 minutos de diferencia."
+        }
+      ],
+      "suscripciones_recurrentes": [
+        {
+          "comercio": "Netflix.com",
+          "monto_mensual": 44.9,
+          "frecuencia_detectada": "2 cargos en el periodo",
+          "transacciones": ["TX004", "TX024"],
+          "explicacion": "Suscripcion recurrente detectada en Netflix.com (S/ 44.90 por ciclo)."
+        }
+      ]
+    },
+    "escudo_antifraude": {
+      "nivel_riesgo_general": "critico",
+      "total_alertas": 2,
+      "alertas_activas": 2,
+      "alertas": [
+        {
+          "alerta_id": "ALR-TX018-viaje_imposible",
+          "transaccion_id": "TX018",
+          "fecha": "2026-10-12",
+          "hora": "14:45",
+          "comercio": "Tienda Mall Aventura",
+          "ciudad": "Trujillo",
+          "canal": "presencial",
+          "monto_pen": 320.0,
+          "severidad": "critica",
+          "regla_activada": "viaje_imposible/6",
+          "titulo": "Posible clonacion de tarjeta (Viaje imposible)",
+          "explicacion": "Posible clonacion: compra presencial en Ica a las 14:00 (TX017) y otra en Trujillo a las 14:45 (TX018), con solo 45 minutos de diferencia.",
+          "traza_prolog": [
+            "transaccion('TX017', '2026-10-12', '14:00', 'Grifo Primax Panamericana', 'Ica', presencial, 85.0)",
+            "transaccion('TX018', '2026-10-12', '14:45', 'Tienda Mall Aventura', 'Trujillo', presencial, 320.0)",
+            "ciudades_distintas('Ica', 'Trujillo') -> true",
+            "diferencia_minutos('14:00', '14:45', 45) -> 45 < 180 min",
+            "regla_activada: viaje_imposible('TX017', 'TX018', 'Ica', 'Trujillo', 45)"
+          ],
+          "z_score": 1.21,
+          "verificada_fui_yo": false
+        }
+      ]
+    },
+    "transacciones": [
+      {
+        "id": "TX001",
+        "fecha": "2026-10-01",
+        "hora": "08:15",
+        "comercio": "Cafe Tostado Ica",
+        "ciudad": "Ica",
+        "canal": "presencial",
+        "monto_original": 11.5,
+        "moneda_original": "PEN",
+        "monto_pen": 11.5,
+        "tipo": "compra",
+        "categoria": "Comida",
+        "etiqueta_modo": "gasto_hormiga",
+        "z_score": -0.4,
+        "es_sospechosa": false
+      }
+    ],
+    "metadatos_motor": {
+      "paradigmas": {
+        "funcional": "Pipeline inmutable Python (modelos frozen, lambdas, map/filter, funciones de orden superior)",
+        "logico": "Motor de inferencia SWI-Prolog (reglas_fraude.pl con hechos transaccion/7 y backtracking)",
+        "multiparadigma_datos": "POO polimorfica (LectorPDF/LectorCSV + Movimiento) + Pandas & NumPy (Z-Score)"
+      },
+      "tiempo_procesamiento_ms": 145.2,
+      "motor_prolog_activo": "pyswip"
+    }
+  }
+}
