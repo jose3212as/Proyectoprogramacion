@@ -1,326 +1,270 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Cpu, Download, History, Shield, Sparkles } from "lucide-react";
-import { AuditForm } from "@/components/AuditForm";
-import { EscudoAntifraudeCard } from "@/components/EscudoAntifraudeCard";
-import { RadarFugasCard } from "@/components/RadarFugasCard";
-import { ResumenGastosCard } from "@/components/ResumenGastosCard";
-import { TransaccionesTable } from "@/components/TransaccionesTable";
+import React from "react";
+import Link from "next/link";
 import {
-  auditarCuentaArchivo,
-  auditarDemoBackend,
-  marcarAlertaFuiYo,
-  obtenerAuditoriaPorId,
-  obtenerHistorial,
-  urlReportePdf,
-  verificarSaludBackend,
-} from "@/lib/api";
-import { MOCK_AUDITORIA_DEMO } from "@/lib/mockData";
-import { AuditoriaResponse, HistorialItem, ModoControl } from "@/types/finguard";
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { ArrowUpRight, ShieldAlert, TrendingDown, ListOrdered } from "lucide-react";
+import { useAudit } from "@/context/AuditContext";
+import { EmptyAuditState } from "@/components/EmptyAuditState";
 
-export default function HomePage() {
-  const [backendOnline, setBackendOnline] = useState<boolean>(false);
-  const [motorProlog, setMotorProlog] = useState<string>("verificando");
-  const [auditoria, setAuditoria] = useState<AuditoriaResponse | null>(null);
-  const [historial, setHistorial] = useState<HistorialItem[]>([]);
-  const [mostrarHistorial, setMostrarHistorial] = useState(false);
-  const [cargando, setCargando] = useState(false);
-  const [actualizandoAlertaId, setActualizandoAlertaId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const PASTEL_CATEGORIAS = [
+  "#5B9A8B",
+  "#8A83C5",
+  "#DF9A78",
+  "#699EC2",
+  "#CE7B91",
+  "#84AE7B",
+  "#9BA4AE",
+];
 
-  const refrescarEstado = async () => {
-    const salud = await verificarSaludBackend();
-    setBackendOnline(salud.online);
-    setMotorProlog(salud.motorProlog ?? "offline");
-    if (salud.online) {
-      try {
-        const items = await obtenerHistorial();
-        setHistorial(items);
-      } catch {
-        // Historial opcional
-      }
-    }
-  };
+export default function ResumenGeneralPage() {
+  const { auditoria } = useAudit();
 
-  useEffect(() => {
-    refrescarEstado();
-  }, []);
+  if (!auditoria) {
+    return (
+      <EmptyAuditState
+        titulo="Bienvenido a FinGuard"
+        descripcion="Sube tu estado de cuenta mensual en PDF o CSV para obtener un diagnóstico claro organizado por secciones: resumen financiero, fugas de dinero y escudo antifraude en SWI-Prolog."
+      />
+    );
+  }
 
-  const manejarAuditarArchivo = async (params: {
-    archivo: File;
-    ciudadHabitual: string;
-    modo: ModoControl;
-    presupuestoMensual: number;
-  }) => {
-    setCargando(true);
-    setError(null);
-    try {
-      const resultado = await auditarCuentaArchivo(params);
-      setAuditoria(resultado);
-      await refrescarEstado();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "No se pudo conectar con el backend FastAPI en http://127.0.0.1:8000."
-      );
-    } finally {
-      setCargando(false);
-    }
-  };
+  const { resumen_gastos: resumen, radar_fugas: radar, escudo_antifraude: escudo, perfil } = auditoria;
 
-  const manejarAuditarDemo = async (params: {
-    formato: "csv" | "pdf";
-    ciudadHabitual: string;
-    modo: ModoControl;
-    presupuestoMensual: number;
-  }) => {
-    setCargando(true);
-    setError(null);
-    try {
-      const resultado = await auditarDemoBackend(params);
-      setAuditoria(resultado);
-      await refrescarEstado();
-    } catch {
-      // Fallback limpio al contrato JSON simulado si el usuario solo encendió Next.js
-      setAuditoria({
-        ...MOCK_AUDITORIA_DEMO,
-        perfil: {
-          ciudad_habitual: params.ciudadHabitual,
-          modo: params.modo,
-          presupuesto_mensual: params.presupuestoMensual,
-        },
-      });
-    } finally {
-      setCargando(false);
-    }
-  };
+  const estadoBg =
+    resumen.estado_presupuesto === "excedido"
+      ? "bg-[#FCE8EC] text-[#8E263D]"
+      : resumen.estado_presupuesto === "precaucion"
+      ? "bg-[#FDEEE4] text-[#9A4D23]"
+      : "bg-[#DDF0E8] text-[#1E4F41]";
 
-  const manejarMarcarFuiYo = async (alertaId: string, verificada: boolean) => {
-    if (!auditoria) return;
-    setActualizandoAlertaId(alertaId);
-    try {
-      if (auditoria.audit_id === "demo-offline-001") {
-        const alertas = auditoria.escudo_antifraude.alertas.map((a) =>
-          a.alerta_id === alertaId ? { ...a, verificada_fui_yo: verificada } : a
-        );
-        const activas = alertas.filter((a) => !a.verificada_fui_yo).length;
-        setAuditoria({
-          ...auditoria,
-          escudo_antifraude: {
-            ...auditoria.escudo_antifraude,
-            alertas_activas: activas,
-            nivel_riesgo_general: activas === 0 ? "bajo" : "critico",
-            alertas,
-          },
-        });
-        return;
-      }
-
-      const resp = await marcarAlertaFuiYo(alertaId, verificada);
-      setAuditoria((prev) => {
-        if (!prev) return prev;
-        const alertas = prev.escudo_antifraude.alertas.map((a) =>
-          a.alerta_id === alertaId ? { ...a, verificada_fui_yo: resp.verificada_fui_yo } : a
-        );
-        const idsActivos = new Set(
-          alertas.filter((a) => !a.verificada_fui_yo).map((a) => a.transaccion_id)
-        );
-        return {
-          ...prev,
-          escudo_antifraude: {
-            ...prev.escudo_antifraude,
-            alertas_activas: resp.alertas_activas,
-            nivel_riesgo_general: resp.nivel_riesgo_general,
-            alertas,
-          },
-          transacciones: prev.transacciones.map((tx) => ({
-            ...tx,
-            es_sospechosa: idsActivos.has(tx.id),
-          })),
-        };
-      });
-      await refrescarEstado();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al actualizar alerta.");
-    } finally {
-      setActualizandoAlertaId(null);
-    }
-  };
-
-  const cargarAuditoriaHistorial = async (auditId: string) => {
-    setCargando(true);
-    try {
-      const data = await obtenerAuditoriaPorId(auditId);
-      setAuditoria(data);
-      setMostrarHistorial(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cargar la auditoría.");
-    } finally {
-      setCargando(false);
-    }
-  };
+  const barraColor =
+    resumen.estado_presupuesto === "excedido"
+      ? "bg-[#CE7B91]"
+      : resumen.estado_presupuesto === "precaucion"
+      ? "bg-[#DF9A78]"
+      : "bg-[#5B9A8B]";
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-teal-400 shadow-sm">
-              <Shield className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-extrabold tracking-tight text-slate-900">FinGuard</h1>
-              <p className="text-xs text-slate-500">
-                Asistente Inteligente de Finanzas Personales y Escudo Antifraude
-              </p>
-            </div>
-          </div>
+    <div className="space-y-10">
+      {/* Encabezado limpio sin cajas */}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#E7E3DA] pb-6">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#2D6A5B]">
+            Bloque 1 • Resumen de Gastos
+          </span>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#1E252B]">
+            ¿A dónde fue mi dinero?
+          </h1>
+          <p className="mt-1 text-sm text-[#616B75]">
+            Extracto <strong className="text-[#1E252B]">{auditoria.archivo}</strong> • Ciudad base:{" "}
+            <strong className="text-[#1E252B]">{perfil.ciudad_habitual}</strong>
+          </p>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
-                backendOnline
-                  ? "bg-emerald-50 text-emerald-800"
-                  : "bg-amber-50 text-amber-800"
-              }`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  backendOnline ? "bg-emerald-500" : "bg-amber-500"
-                }`}
-              />
-              {backendOnline ? `API Conectada (${motorProlog})` : "Modo Demo Offline"}
+        <span className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${estadoBg}`}>
+          {resumen.presupuesto_consumido_pct.toFixed(1)}% del presupuesto mensual
+        </span>
+      </div>
+
+      {/* Franja de KPIs editoriales divididos por líneas finas */}
+      <section className="grid grid-cols-2 divide-y divide-[#E7E3DA] rounded-3xl bg-white sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+        <div className="p-6">
+          <p className="text-xs font-medium text-[#616B75]">Gasto Total del Periodo</p>
+          <p className="mt-2 text-2xl font-extrabold tabular-nums text-[#1E252B]">
+            S/ {resumen.gasto_total.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div className="p-6">
+          <p className="text-xs font-medium text-[#616B75]">Promedio Diario</p>
+          <p className="mt-2 text-2xl font-extrabold tabular-nums text-[#1E252B]">
+            S/ {resumen.promedio_diario.toFixed(2)}
+          </p>
+        </div>
+
+        <div className="p-6">
+          <p className="text-xs font-medium text-[#616B75]">Media / Desviación</p>
+          <p className="mt-2 text-xl font-bold tabular-nums text-[#1E252B]">
+            S/ {resumen.media_transaccion.toFixed(0)}{" "}
+            <span className="text-sm font-normal text-[#616B75]">
+              &plusmn; {resumen.desviacion_estandar.toFixed(0)}
             </span>
+          </p>
+        </div>
 
-            {backendOnline && historial.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setMostrarHistorial((v) => !v)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <History className="h-3.5 w-3.5" />
-                Historial ({historial.length})
-              </button>
-            )}
+        <div className="p-6">
+          <p className="text-xs font-medium text-[#616B75]">Movimientos Analizados</p>
+          <p className="mt-2 text-2xl font-extrabold tabular-nums text-[#1E252B]">
+            {resumen.cantidad_movimientos}
+          </p>
+        </div>
+      </section>
 
-            {auditoria && auditoria.audit_id !== "demo-offline-001" && (
-              <a
-                href={urlReportePdf(auditoria.audit_id)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Exportar Reporte PDF
-              </a>
-            )}
+      {/* Barra de presupuesto limpia */}
+      <section className="space-y-2">
+        <div className="flex justify-between text-xs font-medium text-[#616B75]">
+          <span>
+            Consumo respecto al presupuesto configurado (S/{" "}
+            {perfil.presupuesto_mensual.toLocaleString("es-PE")})
+          </span>
+          <span className="font-semibold text-[#1E252B]">
+            {resumen.presupuesto_consumido_pct.toFixed(1)}%
+          </span>
+        </div>
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#ECE8DF]">
+          <div
+            className={`h-full rounded-full transition-all ${barraColor}`}
+            style={{ width: `${Math.min(resumen.presupuesto_consumido_pct, 100)}%` }}
+          />
+        </div>
+      </section>
+
+      {/* Gráficos en superficie limpia sin bordes pesados */}
+      <section className="grid gap-8 lg:grid-cols-12">
+        <div className="rounded-3xl bg-white p-6 lg:col-span-5">
+          <h2 className="text-sm font-bold text-[#1E252B]">Distribución por Categoría</h2>
+          <p className="mt-0.5 text-xs text-[#616B75]">Clasificación funcional automática</p>
+          <div className="mt-4 h-60">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={resumen.por_categoria}
+                  dataKey="total"
+                  nameKey="categoria"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={52}
+                  outerRadius={84}
+                  paddingAngle={2}
+                >
+                  {resumen.por_categoria.map((cat, idx) => (
+                    <Cell
+                      key={cat.categoria}
+                      fill={PASTEL_CATEGORIAS[idx % PASTEL_CATEGORIAS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [`S/ ${Number(value).toFixed(2)}`, "Total"]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-3 space-y-2">
+            {resumen.por_categoria.map((cat, idx) => (
+              <div key={cat.categoria} className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2 text-[#545E68]">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: PASTEL_CATEGORIAS[idx % PASTEL_CATEGORIAS.length] }}
+                  />
+                  {cat.categoria}
+                </span>
+                <span className="font-semibold tabular-nums text-[#1E252B]">
+                  S/ {cat.total.toFixed(2)}{" "}
+                  <span className="font-normal text-[#616B75]">({cat.porcentaje.toFixed(1)}%)</span>
+                </span>
+              </div>
+            ))}
           </div>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-        {mostrarHistorial && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-sm font-bold text-slate-900">Historial de Auditorías</h2>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {historial.map((h) => (
-                <button
-                  key={h.audit_id}
-                  type="button"
-                  onClick={() => cargarAuditoriaHistorial(h.audit_id)}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-teal-400 hover:bg-white"
-                >
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-900">
-                    <span>{h.archivo}</span>
-                    <span className="uppercase text-teal-700">{h.formato}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {h.ciudad_habitual} • {h.modo} • S/ {h.gasto_total.toFixed(2)}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <AuditForm
-          cargando={cargando}
-          onAuditarArchivo={manejarAuditarArchivo}
-          onAuditarDemo={manejarAuditarDemo}
-        />
-
-        {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
-            {error}
+        <div className="rounded-3xl bg-white p-6 lg:col-span-7">
+          <h2 className="text-sm font-bold text-[#1E252B]">Evolución de Gasto Diario</h2>
+          <p className="mt-0.5 text-xs text-[#616B75]">
+            Picos diarios detectados en el extracto mensual
+          </p>
+          <div className="mt-4 h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={resumen.gasto_diario}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EFECE5" vertical={false} />
+                <XAxis
+                  dataKey="fecha"
+                  tickFormatter={(v) => String(v).slice(5)}
+                  tick={{ fontSize: 11, fill: "#616B75" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#616B75" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip formatter={(value) => [`S/ ${Number(value).toFixed(2)}`, "Gasto"]} />
+                <Bar dataKey="total" fill="#5B9A8B" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        )}
+        </div>
+      </section>
 
-        {!auditoria ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-            <Sparkles className="mx-auto mb-3 h-10 w-10 text-teal-600" />
-            <h2 className="text-lg font-bold text-slate-900">
-              Listo para auditar tus movimientos bancarios
-            </h2>
-            <p className="mx-auto mt-1 max-w-xl text-sm text-slate-500">
-              Sube un estado de cuenta en PDF o CSV arriba, o haz clic en{" "}
-              <strong>Probar Demo CSV / PDF</strong> para visualizar los 3 bloques de diagnóstico
-              (Resumen de Gastos, Radar de Fugas y Escudo Antifraude con SWI-Prolog).
+      {/* Accesos directos a las otras secciones dedicadas */}
+      <section className="grid gap-4 sm:grid-cols-3">
+        <Link
+          href="/fugas"
+          className="group flex items-center justify-between rounded-2xl bg-[#FDEEE4] p-5 transition hover:bg-[#FCE3D3]"
+        >
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#9A4D23]">
+              <TrendingDown className="h-4 w-4" />
+              Radar de Fugas
+            </div>
+            <p className="mt-1.5 text-lg font-extrabold tabular-nums text-[#5D2C12]">
+              S/ {radar.total_fugas_estimado.toFixed(2)}
+            </p>
+            <p className="mt-0.5 text-xs text-[#804322]">
+              {radar.gastos_hormiga.length} hormiga • {radar.cobros_duplicados.length} duplicados
             </p>
           </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
-              <div>
-                Archivo auditado: <strong className="text-slate-900">{auditoria.archivo}</strong> (
-                {auditoria.formato.toUpperCase()}) • Ciudad base:{" "}
-                <strong className="text-slate-900">{auditoria.perfil.ciudad_habitual}</strong> •
-                Modo: <strong className="text-slate-900">{auditoria.perfil.modo}</strong>
-              </div>
-              <div className="inline-flex items-center gap-1.5 font-mono text-slate-700">
-                <Cpu className="h-3.5 w-3.5 text-teal-600" />
-                {auditoria.metadatos_motor.tiempo_procesamiento_ms.toFixed(1)} ms • Motor:{" "}
-                {auditoria.metadatos_motor.motor_prolog_activo}
-              </div>
+          <ArrowUpRight className="h-5 w-5 text-[#9A4D23] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+        </Link>
+
+        <Link
+          href="/seguridad"
+          className="group flex items-center justify-between rounded-2xl bg-[#FCE8EC] p-5 transition hover:bg-[#FADBE2]"
+        >
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#8E263D]">
+              <ShieldAlert className="h-4 w-4" />
+              Escudo Antifraude
             </div>
+            <p className="mt-1.5 text-lg font-extrabold text-[#5C1727]">
+              {escudo.alertas_activas} alertas activas
+            </p>
+            <p className="mt-0.5 text-xs text-[#8E263D]">
+              Nivel de riesgo: {escudo.nivel_riesgo_general.toUpperCase()}
+            </p>
+          </div>
+          <ArrowUpRight className="h-5 w-5 text-[#8E263D] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+        </Link>
 
-            <div className="grid gap-6 xl:grid-cols-2">
-              <div className="xl:col-span-2">
-                <ResumenGastosCard
-                  resumen={auditoria.resumen_gastos}
-                  presupuesto={auditoria.perfil.presupuesto_mensual}
-                />
-              </div>
-              <RadarFugasCard radar={auditoria.radar_fugas} />
-              <EscudoAntifraudeCard
-                escudo={auditoria.escudo_antifraude}
-                actualizandoId={actualizandoAlertaId}
-                onMarcarFuiYo={manejarMarcarFuiYo}
-              />
+        <Link
+          href="/movimientos"
+          className="group flex items-center justify-between rounded-2xl bg-[#EAE7F8] p-5 transition hover:bg-[#E0DCF5]"
+        >
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#4B3F8F]">
+              <ListOrdered className="h-4 w-4" />
+              Movimientos
             </div>
-
-            <TransaccionesTable transacciones={auditoria.transacciones} />
-
-            <footer className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-900 p-5 text-xs text-slate-300 md:grid-cols-3">
-              <div>
-                <p className="font-bold text-teal-400">Unidad 1 — Programación Funcional</p>
-                <p className="mt-1">{auditoria.metadatos_motor.paradigmas.funcional}</p>
-              </div>
-              <div>
-                <p className="font-bold text-teal-400">Unidad 2 — Programación Lógica</p>
-                <p className="mt-1">{auditoria.metadatos_motor.paradigmas.logico}</p>
-              </div>
-              <div>
-                <p className="font-bold text-teal-400">
-                  Unidad 3 — Multiparadigma y Ciencia de Datos
-                </p>
-                <p className="mt-1">{auditoria.metadatos_motor.paradigmas.multiparadigma_datos}</p>
-              </div>
-            </footer>
-          </>
-        )}
-      </main>
+            <p className="mt-1.5 text-lg font-extrabold text-[#2F275E]">
+              {resumen.cantidad_movimientos} registros
+            </p>
+            <p className="mt-0.5 text-xs text-[#4B3F8F]">Explorar libro y Z-Score</p>
+          </div>
+          <ArrowUpRight className="h-5 w-5 text-[#4B3F8F] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+        </Link>
+      </section>
     </div>
   );
 }

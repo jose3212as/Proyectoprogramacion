@@ -2,10 +2,20 @@
 
 :root {
   color-scheme: light;
+  --fg-canvas: #faf9f6;
+  --fg-sidebar: #f3f1eb;
+  --fg-surface: #ffffff;
+  --fg-border: #e7e3da;
+  --fg-ink: #1e252b;
+  --fg-muted: #616b75;
 }
 
 body {
-  background-color: #f8fafc;
-  color: #0f172a;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--fg-canvas);
+  color: var(--fg-ink);
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
