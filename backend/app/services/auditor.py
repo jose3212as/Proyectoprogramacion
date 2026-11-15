@@ -44,6 +44,7 @@ class ServicioAuditorFinGuard:
         ciudad_habitual: str,
         modo: ModoControl,
         presupuesto_mensual: float,
+        usuario_id: str | None = None,
     ) -> AuditoriaResponse:
         inicio = time.perf_counter()
         audit_id = f"aud-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6]}"
@@ -154,5 +155,5 @@ class ServicioAuditorFinGuard:
                 motor_prolog_activo=self.motor_prolog.motor_activo,
             ),
         )
-        self.repositorio.guardar_auditoria(respuesta)
+        self.repositorio.guardar_auditoria(respuesta, usuario_id=usuario_id)
         return respuesta

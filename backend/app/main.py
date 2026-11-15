@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -18,10 +18,14 @@ from app.config import (
 )
 from app.schemas import (
     AuditoriaResponse,
+    AuthResponse,
     HistorialItem,
+    LoginRequest,
     MarcarFuiYoRequest,
     MarcarFuiYoResponse,
     ModoControl,
+    RegistroRequest,
+    UsuarioInfo,
 )
 from app.services import ServicioAuditorFinGuard
 
@@ -49,6 +53,22 @@ def obtener_servicio() -> ServicioAuditorFinGuard:
     return ServicioAuditorFinGuard()
 
 
+def _extraer_token(authorization: str | None = Header(default=None)) -> str | None:
+    if not authorization:
+        return None
+    partes = authorization.split(" ", 1)
+    if len(partes) == 2 and partes[0].lower() == "bearer":
+        return partes[1].strip()
+    return authorization.strip()
+
+
+def obtener_usuario_opcional(
+    token: str | None = Depends(_extraer_token),
+    servicio: ServicioAuditorFinGuard = Depends(obtener_servicio),
+) -> UsuarioInfo | None:
+    return servicio.repositorio.obtener_usuario_por_token(token)
+
+
 @app.get("/health")
 def health_check(servicio: ServicioAuditorFinGuard = Depends(obtener_servicio)) -> dict[str, str]:
     return {
@@ -58,12 +78,62 @@ def health_check(servicio: ServicioAuditorFinGuard = Depends(obtener_servicio)) 
     }
 
 
+@app.post("/api/auth/registro", response_model=AuthResponse)
+def registrar_usuario(
+    body: RegistroRequest,
+    servicio: ServicioAuditorFinGuard = Depends(obtener_servicio),
+) -> AuthResponse:
+    try:
+        return servicio.repositorio.registrar_usuario(
+            nombre=body.nombre,
+            correo=body.correo,
+            password=body.password,
+            ciudad_habitual=body.ciudad_habitual,
+            presupuesto_mensual=body.presupuesto_mensual,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+def iniciar_sesion(
+    body: LoginRequest,
+    servicio: ServicioAuditorFinGuard = Depends(obtener_servicio),
+) -> AuthResponse:
+    try:
+        return servicio.repositorio.autenticar_usuario(
+            correo=body.correo,
+            password=body.password,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+@app.post("/api/auth/logout")
+def cerrar_sesion(
+    token: str | None = Depends(_extraer_token),
+    servicio: ServicioAuditorFinGuard = Depends(obtener_servicio),
+) -> dict[str, bool]:
+    servicio.repositorio.cerrar_sesion(token)
+    return {"ok": True}
+
+
+@app.get("/api/auth/me", response_model=UsuarioInfo)
+def obtener_perfil_actual(
+    usuario: UsuarioInfo | None = Depends(obtener_usuario_opcional),
+) -> UsuarioInfo:
+    if usuario is None:
+        raise HTTPException(status_code=401, detail="No hay sesión activa.")
+    return usuario
+
+
 @app.post("/api/auditar-cuenta", response_model=AuditoriaResponse)
 async def auditar_cuenta(
     archivo: UploadFile = File(..., description="Estado de cuenta en formato .csv o .pdf"),
     ciudad_habitual: str = Form(default=CIUDAD_HABITUAL_DEFAULT),
     modo: ModoControl = Form(default=MODO_DEFAULT),
     presupuesto_mensual: float = Form(default=PRESUPUESTO_MENSUAL_DEFAULT, gt=0),
+    usuario: UsuarioInfo | None = Depends(obtener_usuario_opcional),
     servicio: ServicioAuditorFinGuard = Depends(obtener_servicio),
 ) -> AuditoriaResponse:
     nombre = archivo.filename or "estado_cuenta.csv"
@@ -78,6 +148,7 @@ async def auditar_cuenta(
             ciudad_habitual=ciudad_habitual.strip() or CIUDAD_HABITUAL_DEFAULT,
             modo=modo,
             presupuesto_mensual=presupuesto_mensual,
+            usuario_id=usuario.usuario_id if usuario else None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -89,6 +160,7 @@ def auditar_demo(
     ciudad_habitual: str = Query(default=CIUDAD_HABITUAL_DEFAULT),
     modo: ModoControl = Query(default=MODO_DEFAULT),
     presupuesto_mensual: float = Query(default=PRESUPUESTO_MENSUAL_DEFAULT, gt=0),
+    usuario: UsuarioInfo | None = Depends(obtener_usuario_opcional),
     servicio: ServicioAuditorFinGuard = Depends(obtener_servicio),
 ) -> AuditoriaResponse:
     ruta = DEMO_PDF_PATH if formato == "pdf" else DEMO_CSV_PATH
@@ -101,14 +173,32 @@ def auditar_demo(
         ciudad_habitual=ciudad_habitual,
         modo=modo,
         presupuesto_mensual=presupuesto_mensual,
+        usuario_id=usuario.usuario_id if usuario else None,
     )
 
 
 @app.get("/api/historial", response_model=list[HistorialItem])
 def listar_historial(
+    usuario: UsuarioInfo | None = Depends(obtener_usuario_opcional),
     servicio: ServicioAuditorFinGuard = Depends(obtener_servicio),
 ) -> list[HistorialItem]:
-    return servicio.repositorio.listar_historial()
+    return servicio.repositorio.listar_historial(
+        usuario_id=usuario.usuario_id if usuario else None
+    )
+
+
+@app.post("/api/auditorias/{audit_id}/guardar")
+def guardar_auditoria_en_cuenta(
+    audit_id: str,
+    usuario: UsuarioInfo | None = Depends(obtener_usuario_opcional),
+    servicio: ServicioAuditorFinGuard = Depends(obtener_servicio),
+) -> dict[str, bool]:
+    if usuario is None:
+        raise HTTPException(status_code=401, detail="Inicia sesión para guardar esta revisión.")
+    guardada = servicio.repositorio.asociar_auditoria_usuario(audit_id, usuario.usuario_id)
+    if not guardada:
+        raise HTTPException(status_code=404, detail="Revisión no encontrada.")
+    return {"guardada": True}
 
 
 @app.get("/api/auditorias/{audit_id}", response_model=AuditoriaResponse)

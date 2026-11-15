@@ -5,6 +5,14 @@ import { Search } from "lucide-react";
 import { useAudit } from "@/context/AuditContext";
 import { EmptyAuditState } from "@/components/EmptyAuditState";
 
+const ETIQUETA_AMIGABLE: Record<string, string> = {
+  regular: "Normal",
+  gasto_hormiga: "Gasto pequeño",
+  atencion_seguridad: "Revisar horario",
+  suscripcion_revisar: "Suscripción",
+  recorte_sugerido: "Gasto alto",
+};
+
 export default function MovimientosPage() {
   const { auditoria } = useAudit();
   const [busqueda, setBusqueda] = useState("");
@@ -35,8 +43,8 @@ export default function MovimientosPage() {
   if (!auditoria) {
     return (
       <EmptyAuditState
-        titulo="Libro de Movimientos"
-        descripcion="Explora cada transacción normalizada a soles (PEN), su categoría funcional y su Z-Score estadístico."
+        titulo="Detalle de tus compras"
+        descripcion="Sube tu estado de cuenta para ver cada compra ordenada por fecha, categoría y monto en soles."
       />
     );
   }
@@ -45,18 +53,16 @@ export default function MovimientosPage() {
     <div className="space-y-8">
       <div className="border-b border-[#E7E3DA] pb-6">
         <span className="text-xs font-semibold uppercase tracking-wider text-[#4B3F8F]">
-          Trazabilidad Inmutable • Pandas y Funcional
+          Lista del mes
         </span>
         <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#1E252B]">
-          Libro de Movimientos ({filtradas.length})
+          Mis compras ({filtradas.length})
         </h1>
         <p className="mt-1 text-sm text-[#616B75]">
-          Conversión automática de divisas (USD/EUR a PEN), clasificación funcional y Z-Score por
-          operación.
+          Si tenías compras en dólares o euros, aquí ya aparecen convertidas a soles.
         </p>
       </div>
 
-      {/* Filtros en línea limpia */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="relative min-w-[260px] flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7D8590]" />
@@ -64,7 +70,7 @@ export default function MovimientosPage() {
             type="text"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar comercio, ciudad o ID..."
+            placeholder="Buscar tienda o ciudad..."
             className="w-full rounded-xl border border-[#E2DDD3] bg-white py-2.5 pl-10 pr-4 text-sm text-[#1E252B] focus:border-[#2D6A5B] focus:outline-none"
           />
         </div>
@@ -76,11 +82,10 @@ export default function MovimientosPage() {
             onChange={(e) => setSoloSospechosas(e.target.checked)}
             className="h-4 w-4 rounded accent-[#2D6A5B]"
           />
-          Solo operaciones con alerta
+          Solo compras con aviso
         </label>
       </div>
 
-      {/* Chips pastel de categorías */}
       <div className="flex flex-wrap gap-2">
         {categoriasDisponibles.map((cat) => (
           <button
@@ -100,7 +105,7 @@ export default function MovimientosPage() {
 
       {filtradas.length === 0 ? (
         <div className="rounded-3xl bg-white p-8 text-center text-sm text-[#616B75]">
-          No hay movimientos que coincidan con el filtro aplicado.
+          No encontramos compras con ese filtro.
         </div>
       ) : (
         <div className="overflow-hidden rounded-3xl bg-white">
@@ -108,15 +113,13 @@ export default function MovimientosPage() {
             <table className="w-full border-collapse text-left text-xs">
               <thead>
                 <tr className="border-b border-[#EFECE5] bg-[#F8F7F3] text-[#616B75]">
-                  <th className="px-4 py-3.5 font-semibold">ID</th>
-                  <th className="px-4 py-3.5 font-semibold">Fecha / Hora</th>
-                  <th className="px-4 py-3.5 font-semibold">Comercio</th>
-                  <th className="px-4 py-3.5 font-semibold">Ciudad / Canal</th>
+                  <th className="px-4 py-3.5 font-semibold">Fecha y hora</th>
+                  <th className="px-4 py-3.5 font-semibold">Lugar / Tienda</th>
+                  <th className="px-4 py-3.5 font-semibold">Ciudad y tipo</th>
                   <th className="px-4 py-3.5 font-semibold">Categoría</th>
-                  <th className="px-4 py-3.5 font-semibold text-right">Original</th>
-                  <th className="px-4 py-3.5 font-semibold text-right">PEN</th>
-                  <th className="px-4 py-3.5 font-semibold text-right">Z-Score</th>
-                  <th className="px-4 py-3.5 font-semibold">Etiqueta</th>
+                  <th className="px-4 py-3.5 font-semibold text-right">Monto original</th>
+                  <th className="px-4 py-3.5 font-semibold text-right">En soles</th>
+                  <th className="px-4 py-3.5 font-semibold">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F3F0EA]">
@@ -125,13 +128,12 @@ export default function MovimientosPage() {
                     key={tx.id}
                     className={tx.es_sospechosa ? "bg-[#FCE8EC]/45" : "hover:bg-[#FAF9F6]"}
                   >
-                    <td className="px-4 py-3 font-mono font-semibold text-[#464F59]">{tx.id}</td>
                     <td className="px-4 py-3 text-[#616B75]">
                       {tx.fecha} <span className="text-[#8E969E]">{tx.hora}</span>
                     </td>
                     <td className="px-4 py-3 font-semibold text-[#1E252B]">{tx.comercio}</td>
                     <td className="px-4 py-3 text-[#616B75]">
-                      {tx.ciudad} • <span className="capitalize">{tx.canal}</span>
+                      {tx.ciudad} • {tx.canal === "online" ? "Por internet" : "En tienda"}
                     </td>
                     <td className="px-4 py-3">
                       <span className="rounded-full bg-[#F3F1EB] px-2.5 py-0.5 font-medium text-[#464F59]">
@@ -144,27 +146,14 @@ export default function MovimientosPage() {
                     <td className="px-4 py-3 text-right font-bold tabular-nums text-[#1E252B]">
                       S/ {tx.monto_pen.toFixed(2)}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono tabular-nums">
-                      <span
-                        className={
-                          tx.z_score >= 2
-                            ? "font-bold text-[#8E263D]"
-                            : tx.z_score >= 1.5
-                            ? "font-semibold text-[#9A4D23]"
-                            : "text-[#616B75]"
-                        }
-                      >
-                        {tx.z_score.toFixed(2)}
-                      </span>
-                    </td>
                     <td className="px-4 py-3">
                       {tx.es_sospechosa ? (
                         <span className="rounded-full bg-[#FCE8EC] px-2.5 py-0.5 font-bold text-[#8E263D]">
-                          Alerta activa
+                          Aviso por revisar
                         </span>
                       ) : (
                         <span className="rounded-full bg-[#EEF7F3] px-2.5 py-0.5 font-medium text-[#1E4F41]">
-                          {tx.etiqueta_modo}
+                          {ETIQUETA_AMIGABLE[tx.etiqueta_modo] ?? "Normal"}
                         </span>
                       )}
                     </td>

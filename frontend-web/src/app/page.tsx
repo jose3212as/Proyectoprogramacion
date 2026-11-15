@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowUpRight, ShieldAlert, TrendingDown, ListOrdered } from "lucide-react";
+import { ArrowUpRight, BookmarkPlus, ListOrdered, ShieldAlert, TrendingDown } from "lucide-react";
 import { useAudit } from "@/context/AuditContext";
 import { EmptyAuditState } from "@/components/EmptyAuditState";
 
@@ -29,13 +29,13 @@ const PASTEL_CATEGORIAS = [
 ];
 
 export default function ResumenGeneralPage() {
-  const { auditoria } = useAudit();
+  const { auditoria, usuario } = useAudit();
 
   if (!auditoria) {
     return (
       <EmptyAuditState
         titulo="Bienvenido a FinGuard"
-        descripcion="Sube tu estado de cuenta mensual en PDF o CSV para obtener un diagnóstico claro organizado por secciones: resumen financiero, fugas de dinero y escudo antifraude en SWI-Prolog."
+        descripcion="Sube tu estado de cuenta mensual en PDF o CSV para ver en qué se fue tu dinero, descubrir gastos repetidos y verificar que no haya cobros extraños en tu tarjeta."
       />
     );
   }
@@ -57,67 +57,76 @@ export default function ResumenGeneralPage() {
       : "bg-[#5B9A8B]";
 
   return (
-    <div className="space-y-10">
-      {/* Encabezado limpio sin cajas */}
+    <div className="space-y-9">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#E7E3DA] pb-6">
         <div>
           <span className="text-xs font-semibold uppercase tracking-wider text-[#2D6A5B]">
-            Bloque 1 • Resumen de Gastos
+            Tu resumen del mes
           </span>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#1E252B]">
-            ¿A dónde fue mi dinero?
+            ¿En qué se fue tu dinero?
           </h1>
           <p className="mt-1 text-sm text-[#616B75]">
-            Extracto <strong className="text-[#1E252B]">{auditoria.archivo}</strong> • Ciudad base:{" "}
+            Archivo <strong className="text-[#1E252B]">{auditoria.archivo}</strong> • Ciudad:{" "}
             <strong className="text-[#1E252B]">{perfil.ciudad_habitual}</strong>
           </p>
         </div>
 
         <span className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${estadoBg}`}>
-          {resumen.presupuesto_consumido_pct.toFixed(1)}% del presupuesto mensual
+          Llevas {resumen.presupuesto_consumido_pct.toFixed(1)}% de tu meta mensual
         </span>
       </div>
 
-      {/* Franja de KPIs editoriales divididos por líneas finas */}
+      {!usuario && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#E6EFF8] px-5 py-3.5 text-xs text-[#234F73]">
+          <span>
+            ¿Quieres guardar esta revisión para verla otro día? Inicia sesión o crea tu cuenta en
+            segundos.
+          </span>
+          <Link
+            href="/cuenta"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-1.5 font-semibold text-[#1D4363] transition hover:bg-[#F5F9FD]"
+          >
+            <BookmarkPlus className="h-3.5 w-3.5" />
+            Guardar en mi cuenta
+          </Link>
+        </div>
+      )}
+
       <section className="grid grid-cols-2 divide-y divide-[#E7E3DA] rounded-3xl bg-white sm:grid-cols-4 sm:divide-x sm:divide-y-0">
         <div className="p-6">
-          <p className="text-xs font-medium text-[#616B75]">Gasto Total del Periodo</p>
+          <p className="text-xs font-medium text-[#616B75]">Total gastado</p>
           <p className="mt-2 text-2xl font-extrabold tabular-nums text-[#1E252B]">
             S/ {resumen.gasto_total.toLocaleString("es-PE", { minimumFractionDigits: 2 })}
           </p>
         </div>
 
         <div className="p-6">
-          <p className="text-xs font-medium text-[#616B75]">Promedio Diario</p>
+          <p className="text-xs font-medium text-[#616B75]">Gasto por día</p>
           <p className="mt-2 text-2xl font-extrabold tabular-nums text-[#1E252B]">
             S/ {resumen.promedio_diario.toFixed(2)}
           </p>
         </div>
 
         <div className="p-6">
-          <p className="text-xs font-medium text-[#616B75]">Media / Desviación</p>
-          <p className="mt-2 text-xl font-bold tabular-nums text-[#1E252B]">
-            S/ {resumen.media_transaccion.toFixed(0)}{" "}
-            <span className="text-sm font-normal text-[#616B75]">
-              &plusmn; {resumen.desviacion_estandar.toFixed(0)}
-            </span>
+          <p className="text-xs font-medium text-[#616B75]">Compra promedio</p>
+          <p className="mt-2 text-2xl font-extrabold tabular-nums text-[#1E252B]">
+            S/ {resumen.media_transaccion.toFixed(2)}
           </p>
         </div>
 
         <div className="p-6">
-          <p className="text-xs font-medium text-[#616B75]">Movimientos Analizados</p>
+          <p className="text-xs font-medium text-[#616B75]">Compras revisadas</p>
           <p className="mt-2 text-2xl font-extrabold tabular-nums text-[#1E252B]">
             {resumen.cantidad_movimientos}
           </p>
         </div>
       </section>
 
-      {/* Barra de presupuesto limpia */}
       <section className="space-y-2">
         <div className="flex justify-between text-xs font-medium text-[#616B75]">
           <span>
-            Consumo respecto al presupuesto configurado (S/{" "}
-            {perfil.presupuesto_mensual.toLocaleString("es-PE")})
+            Meta de gasto mensual: S/ {perfil.presupuesto_mensual.toLocaleString("es-PE")}
           </span>
           <span className="font-semibold text-[#1E252B]">
             {resumen.presupuesto_consumido_pct.toFixed(1)}%
@@ -131,11 +140,10 @@ export default function ResumenGeneralPage() {
         </div>
       </section>
 
-      {/* Gráficos en superficie limpia sin bordes pesados */}
       <section className="grid gap-8 lg:grid-cols-12">
         <div className="rounded-3xl bg-white p-6 lg:col-span-5">
-          <h2 className="text-sm font-bold text-[#1E252B]">Distribución por Categoría</h2>
-          <p className="mt-0.5 text-xs text-[#616B75]">Clasificación funcional automática</p>
+          <h2 className="text-sm font-bold text-[#1E252B]">Por tipo de gasto</h2>
+          <p className="mt-0.5 text-xs text-[#616B75]">Así se reparten tus compras</p>
           <div className="mt-4 h-60">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -180,9 +188,9 @@ export default function ResumenGeneralPage() {
         </div>
 
         <div className="rounded-3xl bg-white p-6 lg:col-span-7">
-          <h2 className="text-sm font-bold text-[#1E252B]">Evolución de Gasto Diario</h2>
+          <h2 className="text-sm font-bold text-[#1E252B]">Tus gastos día a día</h2>
           <p className="mt-0.5 text-xs text-[#616B75]">
-            Picos diarios detectados en el extracto mensual
+            Fechas en las que hiciste compras mayores
           </p>
           <div className="mt-4 h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -208,7 +216,6 @@ export default function ResumenGeneralPage() {
         </div>
       </section>
 
-      {/* Accesos directos a las otras secciones dedicadas */}
       <section className="grid gap-4 sm:grid-cols-3">
         <Link
           href="/fugas"
@@ -217,13 +224,13 @@ export default function ResumenGeneralPage() {
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#9A4D23]">
               <TrendingDown className="h-4 w-4" />
-              Radar de Fugas
+              Gastos invisibles
             </div>
             <p className="mt-1.5 text-lg font-extrabold tabular-nums text-[#5D2C12]">
               S/ {radar.total_fugas_estimado.toFixed(2)}
             </p>
             <p className="mt-0.5 text-xs text-[#804322]">
-              {radar.gastos_hormiga.length} hormiga • {radar.cobros_duplicados.length} duplicados
+              {radar.gastos_hormiga.length} repetidos • {radar.cobros_duplicados.length} duplicados
             </p>
           </div>
           <ArrowUpRight className="h-5 w-5 text-[#9A4D23] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -236,13 +243,17 @@ export default function ResumenGeneralPage() {
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#8E263D]">
               <ShieldAlert className="h-4 w-4" />
-              Escudo Antifraude
+              Seguridad
             </div>
             <p className="mt-1.5 text-lg font-extrabold text-[#5C1727]">
-              {escudo.alertas_activas} alertas activas
+              {escudo.alertas_activas === 0
+                ? "Todo en orden"
+                : `${escudo.alertas_activas} avisos por revisar`}
             </p>
             <p className="mt-0.5 text-xs text-[#8E263D]">
-              Nivel de riesgo: {escudo.nivel_riesgo_general.toUpperCase()}
+              {escudo.alertas_activas === 0
+                ? "Sin movimientos sospechosos"
+                : "Revisa si reconoces estas compras"}
             </p>
           </div>
           <ArrowUpRight className="h-5 w-5 text-[#8E263D] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -255,12 +266,12 @@ export default function ResumenGeneralPage() {
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#4B3F8F]">
               <ListOrdered className="h-4 w-4" />
-              Movimientos
+              Mis compras
             </div>
             <p className="mt-1.5 text-lg font-extrabold text-[#2F275E]">
-              {resumen.cantidad_movimientos} registros
+              {resumen.cantidad_movimientos} movimientos
             </p>
-            <p className="mt-0.5 text-xs text-[#4B3F8F]">Explorar libro y Z-Score</p>
+            <p className="mt-0.5 text-xs text-[#4B3F8F]">Ver lista completa del mes</p>
           </div>
           <ArrowUpRight className="h-5 w-5 text-[#4B3F8F] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
         </Link>

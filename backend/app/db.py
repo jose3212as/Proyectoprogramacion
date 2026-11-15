@@ -1,14 +1,43 @@
-"""Persistencia ligera en SQLite para historial de auditorías y falsos positivos ('Fui yo')."""
+"""Persistencia ligera en SQLite para usuarios, sesiones, historial y 'Fui yo'."""
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
+import secrets
 import sqlite3
+import uuid
 from pathlib import Path
 from typing import Iterable
 
 from app.config import DB_PATH
-from app.schemas import AlertaFraude, AuditoriaResponse, HistorialItem, MarcarFuiYoResponse
+from app.schemas import (
+    AlertaFraude,
+    AuditoriaResponse,
+    AuthResponse,
+    HistorialItem,
+    MarcarFuiYoResponse,
+    UsuarioInfo,
+)
+
+
+def _hash_password(password: str, salt: bytes | None = None) -> str:
+    sal = salt or os.urandom(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), sal, 120_000)
+    return f"{sal.hex()}${digest.hex()}"
+
+
+def _verificar_password(password: str, stored_hash: str) -> bool:
+    try:
+        sal_hex, digest_hex = stored_hash.split("$", 1)
+        sal = bytes.fromhex(sal_hex)
+        esperado = bytes.fromhex(digest_hex)
+    except ValueError:
+        return False
+    actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), sal, 120_000)
+    return hmac.compare_digest(actual, esperado)
 
 
 def calcular_nivel_riesgo(alertas: Iterable[AlertaFraude]) -> str:
@@ -44,8 +73,32 @@ class RepositorioSQLite:
         with self._conectar() as conn:
             conn.execute(
                 """
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    usuario_id TEXT PRIMARY KEY,
+                    nombre TEXT NOT NULL,
+                    correo TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    ciudad_habitual TEXT NOT NULL DEFAULT 'Ica',
+                    presupuesto_mensual REAL NOT NULL DEFAULT 2500.0,
+                    creado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sesiones (
+                    token TEXT PRIMARY KEY,
+                    usuario_id TEXT NOT NULL,
+                    creado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (usuario_id) REFERENCES usuarios(usuario_id) ON DELETE CASCADE
+                )
+                """
+            )
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS auditorias (
                     audit_id TEXT PRIMARY KEY,
+                    usuario_id TEXT,
                     archivo TEXT NOT NULL,
                     formato TEXT NOT NULL,
                     fecha_auditoria TEXT NOT NULL,
@@ -58,6 +111,11 @@ class RepositorioSQLite:
                 )
                 """
             )
+            columnas = {
+                row["name"] for row in conn.execute("PRAGMA table_info(auditorias)").fetchall()
+            }
+            if "usuario_id" not in columnas:
+                conn.execute("ALTER TABLE auditorias ADD COLUMN usuario_id TEXT")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS alertas_verificadas (
@@ -71,19 +129,140 @@ class RepositorioSQLite:
             )
             conn.commit()
 
-    def guardar_auditoria(self, auditoria: AuditoriaResponse) -> None:
+    def registrar_usuario(
+        self,
+        *,
+        nombre: str,
+        correo: str,
+        password: str,
+        ciudad_habitual: str,
+        presupuesto_mensual: float,
+    ) -> AuthResponse:
+        correo_norm = correo.strip().lower()
+        usuario_id = f"usr-{uuid.uuid4().hex[:10]}"
+        password_hash = _hash_password(password)
+        token = secrets.token_urlsafe(32)
+
+        with self._conectar() as conn:
+            existente = conn.execute(
+                "SELECT usuario_id FROM usuarios WHERE correo = ?", (correo_norm,)
+            ).fetchone()
+            if existente is not None:
+                raise ValueError("Ya existe una cuenta con ese correo. Inicia sesión.")
+
+            conn.execute(
+                """
+                INSERT INTO usuarios (
+                    usuario_id, nombre, correo, password_hash, ciudad_habitual, presupuesto_mensual
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    usuario_id,
+                    nombre.strip(),
+                    correo_norm,
+                    password_hash,
+                    ciudad_habitual.strip() or "Ica",
+                    presupuesto_mensual,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO sesiones (token, usuario_id) VALUES (?, ?)",
+                (token, usuario_id),
+            )
+            conn.commit()
+
+        return AuthResponse(
+            token=token,
+            usuario=UsuarioInfo(
+                usuario_id=usuario_id,
+                nombre=nombre.strip(),
+                correo=correo_norm,
+                ciudad_habitual=ciudad_habitual.strip() or "Ica",
+                presupuesto_mensual=presupuesto_mensual,
+            ),
+        )
+
+    def autenticar_usuario(self, *, correo: str, password: str) -> AuthResponse:
+        correo_norm = correo.strip().lower()
+        with self._conectar() as conn:
+            fila = conn.execute(
+                """
+                SELECT usuario_id, nombre, correo, password_hash, ciudad_habitual, presupuesto_mensual
+                FROM usuarios
+                WHERE correo = ?
+                """,
+                (correo_norm,),
+            ).fetchone()
+            if fila is None or not _verificar_password(password, fila["password_hash"]):
+                raise ValueError("Correo o contraseña incorrectos.")
+
+            token = secrets.token_urlsafe(32)
+            conn.execute(
+                "INSERT INTO sesiones (token, usuario_id) VALUES (?, ?)",
+                (token, fila["usuario_id"]),
+            )
+            conn.commit()
+
+        return AuthResponse(
+            token=token,
+            usuario=UsuarioInfo(
+                usuario_id=fila["usuario_id"],
+                nombre=fila["nombre"],
+                correo=fila["correo"],
+                ciudad_habitual=fila["ciudad_habitual"],
+                presupuesto_mensual=fila["presupuesto_mensual"],
+            ),
+        )
+
+    def obtener_usuario_por_token(self, token: str | None) -> UsuarioInfo | None:
+        if not token:
+            return None
+        with self._conectar() as conn:
+            fila = conn.execute(
+                """
+                SELECT u.usuario_id, u.nombre, u.correo, u.ciudad_habitual, u.presupuesto_mensual
+                FROM sesiones s
+                JOIN usuarios u ON u.usuario_id = s.usuario_id
+                WHERE s.token = ?
+                """,
+                (token,),
+            ).fetchone()
+        if fila is None:
+            return None
+        return UsuarioInfo(**dict(fila))
+
+    def cerrar_sesion(self, token: str | None) -> None:
+        if not token:
+            return
+        with self._conectar() as conn:
+            conn.execute("DELETE FROM sesiones WHERE token = ?", (token,))
+            conn.commit()
+
+    def asociar_auditoria_usuario(self, audit_id: str, usuario_id: str) -> bool:
+        with self._conectar() as conn:
+            cur = conn.execute(
+                "UPDATE auditorias SET usuario_id = ? WHERE audit_id = ?",
+                (usuario_id, audit_id),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+
+    def guardar_auditoria(
+        self, auditoria: AuditoriaResponse, usuario_id: str | None = None
+    ) -> None:
         payload = auditoria.model_dump_json()
         with self._conectar() as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO auditorias (
-                    audit_id, archivo, formato, fecha_auditoria,
+                    audit_id, usuario_id, archivo, formato, fecha_auditoria,
                     ciudad_habitual, modo, gasto_total, alertas_activas,
                     nivel_riesgo_general, payload_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     auditoria.audit_id,
+                    usuario_id,
                     auditoria.archivo,
                     auditoria.formato,
                     auditoria.fecha_auditoria,
@@ -106,19 +285,36 @@ class RepositorioSQLite:
             return None
         return AuditoriaResponse.model_validate_json(fila["payload_json"])
 
-    def listar_historial(self, limite: int = 20) -> list[HistorialItem]:
+    def listar_historial(
+        self, limite: int = 20, usuario_id: str | None = None
+    ) -> list[HistorialItem]:
         with self._conectar() as conn:
-            filas = conn.execute(
-                """
-                SELECT audit_id, archivo, formato, fecha_auditoria,
-                       ciudad_habitual, modo, gasto_total, alertas_activas,
-                       nivel_riesgo_general
-                FROM auditorias
-                ORDER BY fecha_auditoria DESC
-                LIMIT ?
-                """,
-                (limite,),
-            ).fetchall()
+            if usuario_id is not None:
+                filas = conn.execute(
+                    """
+                    SELECT audit_id, archivo, formato, fecha_auditoria,
+                           ciudad_habitual, modo, gasto_total, alertas_activas,
+                           nivel_riesgo_general
+                    FROM auditorias
+                    WHERE usuario_id = ?
+                    ORDER BY fecha_auditoria DESC
+                    LIMIT ?
+                    """,
+                    (usuario_id, limite),
+                ).fetchall()
+            else:
+                filas = conn.execute(
+                    """
+                    SELECT audit_id, archivo, formato, fecha_auditoria,
+                           ciudad_habitual, modo, gasto_total, alertas_activas,
+                           nivel_riesgo_general
+                    FROM auditorias
+                    WHERE usuario_id IS NULL
+                    ORDER BY fecha_auditoria DESC
+                    LIMIT ?
+                    """,
+                    (limite,),
+                ).fetchall()
         return [HistorialItem(**dict(f)) for f in filas]
 
     def actualizar_estado_fui_yo(self, alerta_id: str, verificada: bool) -> MarcarFuiYoResponse | None:

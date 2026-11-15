@@ -162,3 +162,30 @@ class MarcarFuiYoResponse(BaseModel):
     verificada_fui_yo: bool
     alertas_activas: int
     nivel_riesgo_general: str
+
+
+class UsuarioInfo(BaseModel):
+    usuario_id: str
+    nombre: str
+    correo: str
+    ciudad_habitual: str
+    presupuesto_mensual: float
+
+
+class RegistroRequest(BaseModel):
+    nombre: str = Field(min_length=2, max_length=80)
+    correo: str = Field(min_length=4, max_length=120)
+    password: str = Field(min_length=4, max_length=120)
+    ciudad_habitual: str = Field(default="Ica", min_length=2, max_length=60)
+    presupuesto_mensual: float = Field(default=2500.0, gt=0)
+
+
+class LoginRequest(BaseModel):
+    correo: str = Field(min_length=4, max_length=120)
+    password: str = Field(min_length=4, max_length=120)
+
+
+class AuthResponse(BaseModel):
+    token: str
+    usuario: UsuarioInfo
+

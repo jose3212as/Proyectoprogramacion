@@ -149,3 +149,16 @@ export interface MarcarFuiYoResponse {
   alertas_activas: number;
   nivel_riesgo_general: NivelRiesgo;
 }
+
+export interface UsuarioInfo {
+  usuario_id: string;
+  nombre: string;
+  correo: string;
+  ciudad_habitual: string;
+  presupuesto_mensual: number;
+}
+
+export interface AuthResponse {
+  token: string;
+  usuario: UsuarioInfo;
+}

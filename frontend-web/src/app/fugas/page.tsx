@@ -11,8 +11,8 @@ export default function RadarFugasPage() {
   if (!auditoria) {
     return (
       <EmptyAuditState
-        titulo="Radar de Fugas de Dinero"
-        descripcion="Carga un estado de cuenta para detectar automáticamente gastos hormiga acumulados, cobros duplicados y suscripciones recurrentes."
+        titulo="Gastos invisibles"
+        descripcion="Sube tu estado de cuenta para descubrir pequeños gastos repetidos, cobros por error y suscripciones que se cobran cada mes."
       />
     );
   }
@@ -28,23 +28,23 @@ export default function RadarFugasPage() {
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#E7E3DA] pb-6">
         <div>
           <span className="text-xs font-semibold uppercase tracking-wider text-[#9A4D23]">
-            Bloque 2 • Radar de Fugas de Dinero
+            Gastos invisibles
           </span>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#1E252B]">
-            ¿Dónde estoy perdiendo plata?
+            ¿Dónde se te escapa el dinero?
           </h1>
           <p className="mt-1 text-sm text-[#616B75]">
-            Evaluado en modo{" "}
+            Revisado en{" "}
             <strong className="text-[#1E252B]">
-              {perfil.modo === "ahorro_estricto" ? "Ahorro Estricto" : "Normal"}
+              {perfil.modo === "ahorro_estricto" ? "Modo ahorro" : "Modo tranquilo"}
             </strong>{" "}
-            • {totalFugas} patrones detectados
+            • {totalFugas} hallazgos para tener en cuenta
           </p>
         </div>
 
         <div className="rounded-2xl bg-[#FDEEE4] px-5 py-3 text-right">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9A4D23]">
-            Impacto Estimado
+            Podrías ahorrar aprox.
           </p>
           <p className="text-2xl font-extrabold tabular-nums text-[#5D2C12]">
             S/ {radar.total_fugas_estimado.toFixed(2)}
@@ -52,23 +52,22 @@ export default function RadarFugasPage() {
         </div>
       </div>
 
-      {/* Sección 1: Gastos Hormiga */}
       <section className="space-y-4">
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FDEEE4] text-[#9A4D23]">
             <Coffee className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-base font-bold text-[#1E252B]">Gastos Hormiga Acumulados</h2>
+            <h2 className="text-base font-bold text-[#1E252B]">Pequeños gastos repetidos</h2>
             <p className="text-xs text-[#616B75]">
-              Compras pequeñas repetitivas en un mismo establecimiento
+              Compras chiquitas que se acumulan sin darte cuenta
             </p>
           </div>
         </div>
 
         {radar.gastos_hormiga.length === 0 ? (
           <p className="rounded-2xl bg-[#EEF7F3] px-5 py-4 text-sm text-[#1E4F41]">
-            No se detectaron gastos hormiga recurrentes bajo los umbrales actuales.
+            No encontramos compras pequeñas repetitivas que afecten tu mes.
           </p>
         ) : (
           <div className="divide-y divide-[#EFECE5] rounded-3xl bg-white">
@@ -81,7 +80,7 @@ export default function RadarFugasPage() {
                   <div className="flex items-center gap-2.5">
                     <span className="text-sm font-bold text-[#1E252B]">{h.comercio}</span>
                     <span className="rounded-full bg-[#FDEEE4] px-2.5 py-0.5 text-[11px] font-semibold text-[#9A4D23]">
-                      {h.cantidad} compras • {h.categoria}
+                      {h.cantidad} veces • {h.categoria}
                     </span>
                   </div>
                   <p className="text-xs text-[#616B75]">{h.explicacion}</p>
@@ -91,7 +90,7 @@ export default function RadarFugasPage() {
                     S/ {h.total_acumulado.toFixed(2)}
                   </p>
                   <p className="text-[11px] text-[#616B75]">
-                    Promedio S/ {h.monto_promedio.toFixed(2)}
+                    Unos S/ {h.monto_promedio.toFixed(2)} cada vez
                   </p>
                 </div>
               </div>
@@ -100,23 +99,22 @@ export default function RadarFugasPage() {
         )}
       </section>
 
-      {/* Sección 2: Cobros Duplicados */}
       <section className="space-y-4">
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FCE8EC] text-[#8E263D]">
             <CopyCheck className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-base font-bold text-[#1E252B]">Posibles Cobros Duplicados</h2>
+            <h2 className="text-base font-bold text-[#1E252B]">Cobros repetidos por error</h2>
             <p className="text-xs text-[#616B75]">
-              Cargos idénticos en el mismo comercio o doble facturación en el periodo
+              Cargos con el mismo monto cobrados dos veces en el mismo negocio
             </p>
           </div>
         </div>
 
         {radar.cobros_duplicados.length === 0 ? (
           <p className="rounded-2xl bg-[#EEF7F3] px-5 py-4 text-sm text-[#1E4F41]">
-            No se encontraron cargos duplicados en el extracto.
+            No vimos cobros repetidos en tu estado de cuenta.
           </p>
         ) : (
           <div className="divide-y divide-[#EFECE5] rounded-3xl bg-white">
@@ -129,7 +127,7 @@ export default function RadarFugasPage() {
                   <div className="flex items-center gap-2.5">
                     <span className="text-sm font-bold text-[#1E252B]">{dup.comercio}</span>
                     <span className="rounded-full bg-[#FCE8EC] px-2.5 py-0.5 text-[11px] font-semibold text-[#8E263D]">
-                      {dup.ids_transacciones.join(" + ")}
+                      Cobrado 2 veces
                     </span>
                   </div>
                   <p className="text-xs text-[#616B75]">{dup.explicacion}</p>
@@ -146,23 +144,22 @@ export default function RadarFugasPage() {
         )}
       </section>
 
-      {/* Sección 3: Suscripciones Recurrentes */}
       <section className="space-y-4">
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#EAE7F8] text-[#4B3F8F]">
             <Repeat className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-base font-bold text-[#1E252B]">Suscripciones Recurrentes</h2>
+            <h2 className="text-base font-bold text-[#1E252B]">Suscripciones del mes</h2>
             <p className="text-xs text-[#616B75]">
-              Servicios digitales identificados (incluye conversión de USD/EUR a soles)
+              Pagos mensuales de plataformas o servicios (convertidos a soles si estaban en dólares)
             </p>
           </div>
         </div>
 
         {radar.suscripciones_recurrentes.length === 0 ? (
           <p className="rounded-2xl bg-[#F3F1EB] px-5 py-4 text-sm text-[#616B75]">
-            No se identificaron suscripciones recurrentes en este extracto.
+            No encontramos suscripciones mensuales en este archivo.
           </p>
         ) : (
           <div className="divide-y divide-[#EFECE5] rounded-3xl bg-white">
@@ -184,7 +181,7 @@ export default function RadarFugasPage() {
                   <p className="text-lg font-extrabold tabular-nums text-[#4B3F8F]">
                     S/ {sub.monto_mensual.toFixed(2)}
                   </p>
-                  <p className="text-[11px] text-[#616B75]">por ciclo</p>
+                  <p className="text-[11px] text-[#616B75]">al mes</p>
                 </div>
               </div>
             ))}
