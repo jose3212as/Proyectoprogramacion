@@ -3,8 +3,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   auditarCuentaArchivo,
-  auditarDemoBackend,
   cerrarSesionUsuario,
+  eliminarAuditoriaHistorial,
   guardarRevisionEnCuenta,
   iniciarSesionUsuario,
   marcarAlertaFuiYo,
@@ -14,7 +14,6 @@ import {
   registrarUsuario,
   verificarSaludBackend,
 } from "@/lib/api";
-import { MOCK_AUDITORIA_DEMO } from "@/lib/mockData";
 import { AuditoriaResponse, HistorialItem, ModoControl, UsuarioInfo } from "@/types/finguard";
 
 interface AuditContextValue {
@@ -25,6 +24,7 @@ interface AuditContextValue {
   historial: HistorialItem[];
   cargando: boolean;
   actualizandoAlertaId: string | null;
+  eliminandoAuditId: string | null;
   error: string | null;
   aviso: string | null;
   limpiarError: () => void;
@@ -46,13 +46,8 @@ interface AuditContextValue {
     modo: ModoControl;
     presupuestoMensual: number;
   }) => Promise<boolean>;
-  auditarDemo: (params: {
-    formato: "csv" | "pdf";
-    ciudadHabitual: string;
-    modo: ModoControl;
-    presupuestoMensual: number;
-  }) => Promise<boolean>;
   cargarDesdeHistorial: (auditId: string) => Promise<boolean>;
+  eliminarDelHistorial: (auditId: string) => Promise<boolean>;
   toggleFuiYo: (alertaId: string, verificada: boolean) => Promise<void>;
 }
 
@@ -68,6 +63,7 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
   const [historial, setHistorial] = useState<HistorialItem[]>([]);
   const [cargando, setCargando] = useState(false);
   const [actualizandoAlertaId, setActualizandoAlertaId] = useState<string | null>(null);
+  const [eliminandoAuditId, setEliminandoAuditId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
@@ -157,7 +153,7 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
         const res = await registrarUsuario(params);
         persistirToken(res.token);
         setUsuario(res.usuario);
-        if (auditoria && auditoria.audit_id !== "demo-offline-001") {
+        if (auditoria) {
           await guardarRevisionEnCuenta(auditoria.audit_id, res.token).catch(() => undefined);
         }
         await refrescarEstado(res.token);
@@ -182,7 +178,7 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
         const res = await iniciarSesionUsuario(params);
         persistirToken(res.token);
         setUsuario(res.usuario);
-        if (auditoria && auditoria.audit_id !== "demo-offline-001") {
+        if (auditoria) {
           await guardarRevisionEnCuenta(auditoria.audit_id, res.token).catch(() => undefined);
         }
         await refrescarEstado(res.token);
@@ -209,7 +205,7 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
   }, [persistirToken, token]);
 
   const guardarRevisionActual = useCallback(async (): Promise<boolean> => {
-    if (!auditoria || !token || auditoria.audit_id === "demo-offline-001") return false;
+    if (!auditoria || !token) return false;
     setCargando(true);
     setError(null);
     try {
@@ -254,38 +250,6 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
     [persistirAuditoria, refrescarEstado, token]
   );
 
-  const auditarDemo = useCallback(
-    async (params: {
-      formato: "csv" | "pdf";
-      ciudadHabitual: string;
-      modo: ModoControl;
-      presupuestoMensual: number;
-    }): Promise<boolean> => {
-      setCargando(true);
-      setError(null);
-      setAviso(null);
-      try {
-        const res = await auditarDemoBackend({ ...params, token });
-        persistirAuditoria(res);
-        await refrescarEstado(token);
-        return true;
-      } catch {
-        persistirAuditoria({
-          ...MOCK_AUDITORIA_DEMO,
-          perfil: {
-            ciudad_habitual: params.ciudadHabitual,
-            modo: params.modo,
-            presupuesto_mensual: params.presupuestoMensual,
-          },
-        });
-        return true;
-      } finally {
-        setCargando(false);
-      }
-    },
-    [persistirAuditoria, refrescarEstado, token]
-  );
-
   const cargarDesdeHistorial = useCallback(
     async (auditId: string): Promise<boolean> => {
       setCargando(true);
@@ -304,29 +268,36 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
     [persistirAuditoria]
   );
 
+  const eliminarDelHistorial = useCallback(
+    async (auditId: string): Promise<boolean> => {
+      if (!token) return false;
+      setEliminandoAuditId(auditId);
+      setError(null);
+      setAviso(null);
+      try {
+        await eliminarAuditoriaHistorial(auditId, token);
+        setHistorial((prev) => prev.filter((item) => item.audit_id !== auditId));
+        if (auditoria?.audit_id === auditId) {
+          persistirAuditoria(null);
+        }
+        setAviso("Revisión eliminada de tu historial.");
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No pudimos eliminar esa revisión.");
+        return false;
+      } finally {
+        setEliminandoAuditId(null);
+      }
+    },
+    [auditoria, persistirAuditoria, token]
+  );
+
   const toggleFuiYo = useCallback(
     async (alertaId: string, verificada: boolean) => {
       if (!auditoria) return;
       setActualizandoAlertaId(alertaId);
       setError(null);
       try {
-        if (auditoria.audit_id === "demo-offline-001") {
-          const alertas = auditoria.escudo_antifraude.alertas.map((a) =>
-            a.alerta_id === alertaId ? { ...a, verificada_fui_yo: verificada } : a
-          );
-          const activas = alertas.filter((a) => !a.verificada_fui_yo).length;
-          persistirAuditoria({
-            ...auditoria,
-            escudo_antifraude: {
-              ...auditoria.escudo_antifraude,
-              alertas_activas: activas,
-              nivel_riesgo_general: activas === 0 ? "bajo" : "critico",
-              alertas,
-            },
-          });
-          return;
-        }
-
         const resp = await marcarAlertaFuiYo(alertaId, verificada);
         const alertas = auditoria.escudo_antifraude.alertas.map((a) =>
           a.alerta_id === alertaId ? { ...a, verificada_fui_yo: resp.verificada_fui_yo } : a
@@ -367,6 +338,7 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
         historial,
         cargando,
         actualizandoAlertaId,
+        eliminandoAuditId,
         error,
         aviso,
         limpiarError: () => setError(null),
@@ -377,8 +349,8 @@ export function AuditProvider({ children }: { children: React.ReactNode }) {
         cerrarSesion,
         guardarRevisionActual,
         auditarArchivo,
-        auditarDemo,
         cargarDesdeHistorial,
+        eliminarDelHistorial,
         toggleFuiYo,
       }}
     >

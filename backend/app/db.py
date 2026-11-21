@@ -285,6 +285,26 @@ class RepositorioSQLite:
             return None
         return AuditoriaResponse.model_validate_json(fila["payload_json"])
 
+    def eliminar_auditoria(self, audit_id: str, usuario_id: str | None = None) -> bool:
+        """Elimina una auditoría del historial y sus alertas verificadas asociadas."""
+        with self._conectar() as conn:
+            if usuario_id is not None:
+                cur = conn.execute(
+                    "DELETE FROM auditorias WHERE audit_id = ? AND usuario_id = ?",
+                    (audit_id, usuario_id),
+                )
+            else:
+                cur = conn.execute(
+                    "DELETE FROM auditorias WHERE audit_id = ? AND usuario_id IS NULL",
+                    (audit_id,),
+                )
+            if cur.rowcount > 0:
+                conn.execute(
+                    "DELETE FROM alertas_verificadas WHERE audit_id = ?", (audit_id,)
+                )
+            conn.commit()
+            return cur.rowcount > 0
+
     def listar_historial(
         self, limite: int = 20, usuario_id: str | None = None
     ) -> list[HistorialItem]:

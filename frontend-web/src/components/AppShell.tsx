@@ -117,30 +117,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {auditoria.perfil.modo === "ahorro_estricto" ? "Modo ahorro" : "Modo tranquilo"}
                 </p>
               </div>
-              {auditoria.audit_id !== "demo-offline-001" && (
-                <div className="flex flex-col gap-1.5">
-                  <a
-                    href={urlReportePdf(auditoria.audit_id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#2D6A5B] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#235448]"
+              <div className="flex flex-col gap-1.5">
+                <a
+                  href={urlReportePdf(auditoria.audit_id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#2D6A5B] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#235448]"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Descargar resumen PDF
+                </a>
+                {usuario && (
+                  <button
+                    type="button"
+                    disabled={cargando}
+                    onClick={guardarRevisionActual}
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#E3F1EC] px-3 py-1.5 text-xs font-semibold text-[#1E4F41] transition hover:bg-[#D5EAE2] disabled:opacity-50"
                   >
-                    <Download className="h-3.5 w-3.5" />
-                    Descargar resumen PDF
-                  </a>
-                  {usuario && (
-                    <button
-                      type="button"
-                      disabled={cargando}
-                      onClick={guardarRevisionActual}
-                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#E3F1EC] px-3 py-1.5 text-xs font-semibold text-[#1E4F41] transition hover:bg-[#D5EAE2] disabled:opacity-50"
-                    >
-                      <BookmarkCheck className="h-3.5 w-3.5" />
-                      Guardar en mi historial
-                    </button>
-                  )}
-                </div>
-              )}
+                    <BookmarkCheck className="h-3.5 w-3.5" />
+                    Guardar en mi historial
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

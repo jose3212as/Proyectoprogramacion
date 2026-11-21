@@ -71,17 +71,15 @@ export default function SeguridadPage() {
           <span className={`rounded-full px-4 py-1.5 text-xs font-bold ${badgeRiesgo.clase}`}>
             {badgeRiesgo.texto}
           </span>
-          {auditoria.audit_id !== "demo-offline-001" && (
-            <a
-              href={urlReportePdf(auditoria.audit_id)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#2D6A5B] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#235448]"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Descargar PDF para reclamo
-            </a>
-          )}
+          <a
+            href={urlReportePdf(auditoria.audit_id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#2D6A5B] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#235448]"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Descargar PDF para reclamo
+          </a>
         </div>
       </div>
 

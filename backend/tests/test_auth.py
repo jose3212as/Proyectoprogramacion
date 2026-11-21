@@ -64,4 +64,19 @@ def test_registro_login_y_guardado_historial_usuario(tmp_path: Path) -> None:
     assert resp_hist_reingreso.status_code == 200
     assert len(resp_hist_reingreso.json()) == 1
 
+    # 6. Eliminar sin sesión falla (401) y con sesión elimina la revisión del historial
+    assert client.delete(f"/api/auditorias/{audit_id}").status_code == 401
+    resp_del = client.delete(
+        f"/api/auditorias/{audit_id}", headers={"Authorization": f"Bearer {nuevo_token}"}
+    )
+    assert resp_del.status_code == 200
+    assert resp_del.json()["eliminada"] is True
+
+    resp_hist_final = client.get(
+        "/api/historial", headers={"Authorization": f"Bearer {nuevo_token}"}
+    )
+    assert resp_hist_final.status_code == 200
+    assert resp_hist_final.json() == []
+    assert client.get(f"/api/auditorias/{audit_id}").status_code == 404
+
     app.dependency_overrides.clear()

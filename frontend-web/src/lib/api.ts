@@ -109,27 +109,6 @@ export async function auditarCuentaArchivo(params: {
   return res.json();
 }
 
-export async function auditarDemoBackend(params: {
-  formato: "csv" | "pdf";
-  ciudadHabitual: string;
-  modo: ModoControl;
-  presupuestoMensual: number;
-  token?: string | null;
-}): Promise<AuditoriaResponse> {
-  const query = new URLSearchParams({
-    formato: params.formato,
-    ciudad_habitual: params.ciudadHabitual,
-    modo: params.modo,
-    presupuesto_mensual: String(params.presupuestoMensual),
-  });
-  const res = await fetch(`${API_BASE}/api/demo?${query.toString()}`, {
-    headers: headersConToken(params.token),
-    cache: "no-store",
-  });
-  if (!res.ok) return manejarError(res);
-  return res.json();
-}
-
 export async function guardarRevisionEnCuenta(
   auditId: string,
   token: string
@@ -175,6 +154,17 @@ export async function obtenerAuditoriaPorId(auditId: string): Promise<AuditoriaR
   });
   if (!res.ok) return manejarError(res);
   return res.json();
+}
+
+export async function eliminarAuditoriaHistorial(
+  auditId: string,
+  token: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/auditorias/${encodeURIComponent(auditId)}`, {
+    method: "DELETE",
+    headers: headersConToken(token),
+  });
+  if (!res.ok) return manejarError(res);
 }
 
 export function urlReportePdf(auditId: string): string {

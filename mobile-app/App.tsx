@@ -12,12 +12,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import * as DocumentPicker from "expo-document-picker";
 import { DiagnosisCards } from "./src/components/DiagnosisCards";
-import {
-  DEMO_OFFLINE_MOBILE,
-  auditarArchivoMobile,
-  auditarDemoMobile,
-  marcarFuiYoMobile,
-} from "./src/services/api";
+import { auditarArchivoMobile, marcarFuiYoMobile } from "./src/services/api";
 import { AuditoriaResponse, ModoControl } from "./src/types/finguard";
 
 export default function App() {
@@ -69,42 +64,8 @@ export default function App() {
     }
   };
 
-  const ejecutarDemo = async (formato: "csv" | "pdf") => {
-    setCargando(true);
-    setMensajeError(null);
-    try {
-      const resp = await auditarDemoMobile({
-        formato,
-        ciudadHabitual: ciudad.trim() || "Ica",
-        modo,
-        presupuestoMensual: Math.max(Number(presupuesto) || 2500, 100),
-      });
-      setAuditoria(resp);
-    } catch {
-      setAuditoria(DEMO_OFFLINE_MOBILE);
-    } finally {
-      setCargando(false);
-    }
-  };
-
   const manejarFuiYo = async (alertaId: string, verificada: boolean) => {
     if (!auditoria) return;
-    if (auditoria.audit_id === "mobile-demo-offline") {
-      const alertas = auditoria.escudo_antifraude.alertas.map((a) =>
-        a.alerta_id === alertaId ? { ...a, verificada_fui_yo: verificada } : a
-      );
-      const activas = alertas.filter((a) => !a.verificada_fui_yo).length;
-      setAuditoria({
-        ...auditoria,
-        escudo_antifraude: {
-          ...auditoria.escudo_antifraude,
-          alertas_activas: activas,
-          nivel_riesgo_general: activas === 0 ? "bajo" : "critico",
-          alertas,
-        },
-      });
-      return;
-    }
 
     const res = await marcarFuiYoMobile(alertaId, verificada);
     setAuditoria((prev) => {
@@ -128,9 +89,9 @@ export default function App() {
       <StatusBar style="dark" />
       <ScrollView className="flex-1 px-4 pt-4">
         <View className="mb-4 rounded-2xl bg-slate-900 p-4">
-          <Text className="text-xl font-extrabold text-white">FinGuard Móvil</Text>
+          <Text className="text-xl font-extrabold text-white">FinGuard</Text>
           <Text className="mt-1 text-xs text-slate-300">
-            Auditoría privada de extractos PDF/CSV y escudo antifraude en SWI-Prolog
+            Revisión privada de estados de cuenta PDF/CSV y escudo antifraude
           </Text>
         </View>
 
@@ -211,21 +172,6 @@ export default function App() {
           >
             <Text className="text-sm font-bold text-white">Auditar Cuenta</Text>
           </Pressable>
-
-          <View className="mt-3 flex-row gap-2">
-            <Pressable
-              onPress={() => ejecutarDemo("csv")}
-              className="flex-1 items-center rounded-xl bg-emerald-50 py-2.5"
-            >
-              <Text className="text-xs font-bold text-emerald-800">Probar Demo CSV</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => ejecutarDemo("pdf")}
-              className="flex-1 items-center rounded-xl bg-sky-50 py-2.5"
-            >
-              <Text className="text-xs font-bold text-sky-800">Probar Demo PDF</Text>
-            </Pressable>
-          </View>
         </View>
 
         {cargando && <ActivityIndicator size="large" color="#0d9488" className="my-4" />}

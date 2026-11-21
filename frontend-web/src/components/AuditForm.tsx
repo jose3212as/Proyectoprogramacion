@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileSpreadsheet, FileText, MapPin, ShieldCheck, Sliders, UploadCloud } from "lucide-react";
+import { FileSpreadsheet, FileText, Lock, MapPin, ShieldCheck, Sliders, UploadCloud } from "lucide-react";
 import { useAudit } from "@/context/AuditContext";
 import { ModoControl } from "@/types/finguard";
 
@@ -11,7 +11,7 @@ const CIUDADES_SUGERIDAS = ["Ica", "Lima", "Trujillo", "Arequipa", "Cusco", "Piu
 export function AuditForm() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const { auditarArchivo, auditarDemo, cargando, error, limpiarError, usuario } = useAudit();
+  const { auditarArchivo, cargando, error, limpiarError, usuario } = useAudit();
 
   const [archivo, setArchivo] = useState<File | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
@@ -39,18 +39,6 @@ export function AuditForm() {
     if (!archivo) return;
     const ok = await auditarArchivo({
       archivo,
-      ciudadHabitual: ciudadHabitual.trim() || "Ica",
-      modo,
-      presupuestoMensual: presupuestoNum,
-    });
-    if (ok) {
-      router.push("/");
-    }
-  };
-
-  const ejecutarDemo = async (formato: "csv" | "pdf") => {
-    const ok = await auditarDemo({
-      formato,
       ciudadHabitual: ciudadHabitual.trim() || "Ica",
       modo,
       presupuestoMensual: presupuestoNum,
@@ -126,26 +114,23 @@ export function AuditForm() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 pt-1">
-            <span className="text-xs font-medium text-[#616B75]">¿Quieres ver un ejemplo?</span>
-            <button
-              type="button"
-              disabled={cargando}
-              onClick={() => ejecutarDemo("csv")}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#E3F1EC] px-3 py-1.5 text-xs font-semibold text-[#1E4F41] transition hover:bg-[#D5EAE2] disabled:opacity-50"
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              Ejemplo CSV
-            </button>
-            <button
-              type="button"
-              disabled={cargando}
-              onClick={() => ejecutarDemo("pdf")}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#E6EFF8] px-3 py-1.5 text-xs font-semibold text-[#234F73] transition hover:bg-[#D8E7F5] disabled:opacity-50"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Ejemplo PDF
-            </button>
+          <div className="rounded-2xl border border-[#E7E3DA] bg-white p-4 space-y-2.5 text-xs text-[#545E68]">
+            <p className="font-semibold text-[#1E252B]">Formatos admitidos</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#E6EFF8] px-2.5 py-1 font-medium text-[#234F73]">
+                <FileText className="h-3.5 w-3.5" />
+                PDF bancario (extracto mensual)
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#E3F1EC] px-2.5 py-1 font-medium text-[#1E4F41]">
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                CSV de movimientos
+              </span>
+            </div>
+            <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-[#616B75]">
+              <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2D6A5B]" />
+              Tu archivo se procesa de forma privada. Nunca solicitamos usuarios, claves ni tokens
+              de acceso a tu banca.
+            </p>
           </div>
         </div>
 

@@ -1,20 +1,36 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Download, LogIn } from "lucide-react";
+import { ArrowRight, CheckCircle2, Download, LogIn, Trash2 } from "lucide-react";
 import { useAudit } from "@/context/AuditContext";
 import { urlReportePdf } from "@/lib/api";
 
 export default function HistorialPage() {
   const router = useRouter();
-  const { historial, usuario, cargarDesdeHistorial } = useAudit();
+  const {
+    historial,
+    usuario,
+    eliminandoAuditId,
+    error,
+    aviso,
+    cargarDesdeHistorial,
+    eliminarDelHistorial,
+  } = useAudit();
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
 
   const abrirRevision = async (auditId: string) => {
     const ok = await cargarDesdeHistorial(auditId);
     if (ok) {
       router.push("/");
+    }
+  };
+
+  const confirmarEliminacion = async (auditId: string) => {
+    const ok = await eliminarDelHistorial(auditId);
+    if (ok) {
+      setConfirmandoId(null);
     }
   };
 
@@ -29,6 +45,19 @@ export default function HistorialPage() {
           Aquí aparecen los estados de cuenta que guardaste en tu perfil para volver a consultarlos.
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-2xl bg-[#FCE8EC] px-4 py-3 text-sm font-medium text-[#8E263D]">
+          {error}
+        </div>
+      )}
+
+      {aviso && (
+        <div className="flex items-center gap-2 rounded-2xl bg-[#DDF0E8] px-4 py-3 text-sm font-medium text-[#1E4F41]">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          {aviso}
+        </div>
+      )}
 
       {!usuario ? (
         <div className="mx-auto max-w-xl rounded-3xl bg-[#F3F1EB] p-8">
@@ -62,47 +91,85 @@ export default function HistorialPage() {
         </div>
       ) : (
         <div className="divide-y divide-[#EFECE5] rounded-3xl bg-white">
-          {historial.map((h) => (
-            <div
-              key={h.audit_id}
-              className="flex flex-wrap items-center justify-between gap-4 px-6 py-4"
-            >
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <span className="text-sm font-bold text-[#1E252B]">{h.archivo}</span>
-                  <span className="rounded-full bg-[#E6EFF8] px-2 py-0.5 text-[10px] font-bold uppercase text-[#234F73]">
-                    {h.formato}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-xs text-[#616B75]">
-                  {h.ciudad_habitual} •{" "}
-                  {h.modo === "ahorro_estricto" ? "Modo ahorro" : "Modo tranquilo"} • Total: S/{" "}
-                  {h.gasto_total.toFixed(2)} •{" "}
-                  {h.alertas_activas === 0 ? "Sin avisos" : `${h.alertas_activas} avisos`}
-                </p>
-              </div>
+          {historial.map((h) => {
+            const confirmando = confirmandoId === h.audit_id;
+            const eliminando = eliminandoAuditId === h.audit_id;
 
-              <div className="flex items-center gap-2">
-                <a
-                  href={urlReportePdf(h.audit_id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-xl bg-[#F3F1EB] px-3 py-1.5 text-xs font-semibold text-[#464F59] hover:bg-[#E7E3DA]"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Resumen PDF
-                </a>
-                <button
-                  type="button"
-                  onClick={() => abrirRevision(h.audit_id)}
-                  className="inline-flex items-center gap-1 rounded-xl bg-[#2D6A5B] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#235448]"
-                >
-                  Abrir
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+            return (
+              <div
+                key={h.audit_id}
+                className="flex flex-wrap items-center justify-between gap-4 px-6 py-4"
+              >
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm font-bold text-[#1E252B]">{h.archivo}</span>
+                    <span className="rounded-full bg-[#E6EFF8] px-2 py-0.5 text-[10px] font-bold uppercase text-[#234F73]">
+                      {h.formato}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-[#616B75]">
+                    {h.ciudad_habitual} •{" "}
+                    {h.modo === "ahorro_estricto" ? "Modo ahorro" : "Modo tranquilo"} • Total: S/{" "}
+                    {h.gasto_total.toFixed(2)} •{" "}
+                    {h.alertas_activas === 0 ? "Sin avisos" : `${h.alertas_activas} avisos`}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {confirmando ? (
+                    <>
+                      <span className="text-xs font-medium text-[#8E263D]">¿Eliminar?</span>
+                      <button
+                        type="button"
+                        disabled={eliminando}
+                        onClick={() => confirmarEliminacion(h.audit_id)}
+                        className="inline-flex items-center gap-1 rounded-xl bg-[#B8324D] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#96263D] disabled:opacity-50"
+                      >
+                        {eliminando ? "Eliminando..." : "Sí, eliminar"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={eliminando}
+                        onClick={() => setConfirmandoId(null)}
+                        className="rounded-xl bg-[#F3F1EB] px-3 py-1.5 text-xs font-semibold text-[#545E68] transition hover:bg-[#E7E3DA] disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <a
+                        href={urlReportePdf(h.audit_id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-xl bg-[#F3F1EB] px-3 py-1.5 text-xs font-semibold text-[#464F59] hover:bg-[#E7E3DA]"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Resumen PDF
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => abrirRevision(h.audit_id)}
+                        className="inline-flex items-center gap-1 rounded-xl bg-[#2D6A5B] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#235448]"
+                      >
+                        Abrir
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmandoId(h.audit_id)}
+                        title="Eliminar del historial"
+                        className="inline-flex items-center gap-1 rounded-xl bg-[#FCE8EC] px-3 py-1.5 text-xs font-semibold text-[#8E263D] transition hover:bg-[#F8D7DE]"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Eliminar
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

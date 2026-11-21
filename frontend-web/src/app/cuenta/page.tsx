@@ -101,7 +101,7 @@ export default function CuentaPage() {
           </div>
 
           <div className="flex flex-wrap gap-3 pt-1">
-            {auditoria && auditoria.audit_id !== "demo-offline-001" && (
+            {auditoria && (
               <button
                 type="button"
                 disabled={cargando}

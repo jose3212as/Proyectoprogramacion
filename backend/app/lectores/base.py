@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -100,26 +101,138 @@ def crear_movimiento(
 
 
 _ALIAS_COLUMNAS: dict[str, tuple[str, ...]] = {
-    "id": ("id", "tx_id", "codigo", "operacion", "nro", "num"),
-    "fecha": ("fecha", "date", "fecha_operacion", "fecha_movimiento", "fec"),
+    "id": ("id", "tx_id", "codigo", "operacion", "nro", "num", "n_op", "no_op", "nro_op", "n_oper", "ref"),
+    "fecha": (
+        "fecha",
+        "date",
+        "fecha_operacion",
+        "fecha_movimiento",
+        "fec",
+        "fecha_op",
+        "fecha_oper",
+        "fecha_consumo",
+    ),
     "hora": ("hora", "time", "hora_operacion"),
-    "comercio": ("comercio", "descripcion", "establecimiento", "concepto", "merchant", "detalle"),
+    "comercio": (
+        "comercio",
+        "descripcion",
+        "descripcion_del_movimiento",
+        "descripcion_de_la_operacion",
+        "descripcion_concepto",
+        "concepto_descripcion",
+        "concepto_establecimiento",
+        "establecimiento",
+        "concepto",
+        "merchant",
+        "detalle",
+        "glosa",
+    ),
     "ciudad": ("ciudad", "city", "ubicacion", "lugar", "localidad"),
     "canal": ("canal", "channel", "modalidad", "tipo_canal"),
-    "monto": ("monto", "importe", "amount", "cargo", "valor", "total"),
+    "lugar_canal": (
+        "lugar_canal",
+        "canal_ciudad",
+        "canal_lugar",
+        "oficina_canal",
+        "localidad_canal",
+        "ciudad_canal",
+    ),
+    "monto": ("monto", "importe", "amount", "cargo", "cargos", "valor", "total"),
+    "monto_pen": ("soles", "soles_s", "cargo_s", "cargos_s", "importe_s", "monto_s"),
+    "monto_usd": ("dolares", "dolares_us", "cargo_us", "cargos_us", "importe_us", "monto_us"),
     "moneda": ("moneda", "currency", "divisa"),
     "tipo": ("tipo", "type", "clase"),
 }
 
-_FORMATOS_FECHA = ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d")
+_FORMATOS_FECHA = ("%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y", "%d-%m-%Y", "%Y/%m/%d")
+_FILAS_NO_GASTO = (
+    "saldo anterior",
+    "saldo inicial",
+    "saldo final",
+    "saldo contable",
+    "sub total",
+    "subtotal",
+    "total cargos",
+    "total abonos",
+    "total consumos",
+    "monto total",
+    "abono de haberes",
+    "abono haberes",
+    "abono transf",
+    "transf. haberes",
+    "pago recibido",
+    "pago banca movil",
+    "pago en ventanilla",
+    "pago tarjeta",
+    "impuesto itf",
+)
+_PREFIJOS_GLOSA = (
+    "compra pos ",
+    "consumo pos ",
+    "consumo web ",
+    "compra web ",
+    "pago serv. ",
+    "pago serv ",
+    "cargo aut. ",
+    "cargo aut ",
+    "pos ",
+    "web ",
+)
+
+
+def _sin_tildes(texto: str) -> str:
+    nfkd = unicodedata.normalize("NFKD", texto)
+    return "".join(ch for ch in nfkd if not unicodedata.combining(ch))
 
 
 def _normalizar_clave_columna(nombre: str) -> str:
-    limpio = re.sub(r"\s+", "_", nombre.strip().lower())
+    sin_tildes = _sin_tildes(nombre).lower()
+    limpio = re.sub(r"[^a-z0-9]+", "_", sin_tildes).strip("_")
     for canonico, aliases in _ALIAS_COLUMNAS.items():
         if limpio in aliases:
             return canonico
     return limpio
+
+
+def _extraer_ciudad_y_canal(raw_combinado: str, ciudad_default: str) -> tuple[str, str]:
+    texto = raw_combinado.strip()
+    if not texto:
+        return ciudad_default, ""
+
+    low = _sin_tildes(texto).lower()
+    canal = ""
+    if any(k in low for k in ("online", "web", "digital", "bmovil", "app", "internet", "e-comm")):
+        canal = "online"
+    elif any(k in low for k in ("presencial", "pos", "tienda", "fisico", "cajero", "agencia")):
+        canal = "presencial"
+
+    limpio = re.sub(
+        r"\b(presencial|online|web|digital|bmovil|app|internet|e-comm|pos|tienda|fisico|cajero|agencia)\b",
+        "",
+        texto,
+        flags=re.IGNORECASE,
+    )
+    limpio = re.sub(r"[-/|•]+", " ", limpio)
+    limpio = re.sub(r"\s+", " ", limpio).strip()
+    ciudad = limpio.title() if limpio else ciudad_default
+    return ciudad, canal
+
+
+def _limpiar_comercio_glosa(raw_comercio: str) -> str:
+    texto = re.sub(r"\s+", " ", raw_comercio).strip()
+    low = _sin_tildes(texto).lower()
+    for prefijo in _PREFIJOS_GLOSA:
+        if low.startswith(prefijo):
+            texto = texto[len(prefijo) :].strip()
+            break
+    if texto.isupper() and len(texto) > 4:
+        texto = " ".join(
+            p
+            if (p in {"USA", "BCP", "BBVA", "S.A.", "PE"} or any(ch.isdigit() for ch in p))
+            else p.capitalize()
+            for p in texto.split()
+        )
+    return texto
 
 
 def _normalizar_fecha_y_hora(raw_fecha: str, raw_hora: str) -> tuple[str, str]:
@@ -159,7 +272,7 @@ def _parsear_monto_y_moneda(raw_monto: Any, raw_moneda: str) -> tuple[float, str
     elif moneda in {"S/", "SOL", "SOLES"}:
         moneda = "PEN"
 
-    limpio = re.sub(r"[^\d.,-]", "", texto)
+    limpio = re.sub(r"[^\d.,-]", "", texto).strip("-")
     if "," in limpio and "." in limpio:
         if limpio.rfind(",") > limpio.rfind("."):
             limpio = limpio.replace(".", "").replace(",", ".")
@@ -177,26 +290,29 @@ def _parsear_monto_y_moneda(raw_monto: Any, raw_moneda: str) -> tuple[float, str
 
 
 def _inferir_canal(raw_canal: str, comercio: str) -> str:
-    canal = raw_canal.strip().lower()
-    if canal in {"online", "web", "internet", "digital", "app"}:
+    canal = _sin_tildes(raw_canal).strip().lower()
+    if canal in {"online", "web", "internet", "digital", "app", "bmovil"}:
         return "online"
-    if canal in {"presencial", "fisico", "físico", "pos", "tienda"}:
+    if canal in {"presencial", "fisico", "pos", "tienda"}:
         return "presencial"
 
-    comercio_low = comercio.lower()
+    comercio_low = _sin_tildes(comercio).lower()
     pistas_online = ("netflix", "spotify", "amazon", "uber", "rappi", ".com", "online", "electro", "agua")
     return "online" if any(p in comercio_low for p in pistas_online) else "presencial"
 
 
 def _inferir_tipo(raw_tipo: str, comercio: str) -> str:
-    tipo = raw_tipo.strip().lower()
+    tipo = _sin_tildes(raw_tipo).strip().lower()
     if tipo in {"compra", "suscripcion", "servicio"}:
         return tipo
 
-    comercio_low = comercio.lower()
-    if any(k in comercio_low for k in ("netflix", "spotify", "prime", "disney", "hbo", "icloud")):
+    comercio_low = _sin_tildes(comercio).lower()
+    if any(k in comercio_low for k in ("netflix", "spotify", "prime", "disney", "hbo", "icloud", "cargo aut")):
         return "suscripcion"
-    if any(k in comercio_low for k in ("luz", "agua", "emapica", "electroluz", "internet", "sedapal")):
+    if any(
+        k in comercio_low
+        for k in ("luz", "agua", "emapica", "electroluz", "internet", "sedapal", "movistar", "claro", "pago serv")
+    ):
         return "servicio"
     return "compra"
 
@@ -234,16 +350,34 @@ class LectorEstadoCuenta(ABC):
             raw_fecha = normalizada.get("fecha", "")
             raw_comercio = normalizada.get("comercio", "")
             raw_monto = normalizada.get("monto", "")
+            raw_moneda = normalizada.get("moneda", "")
 
-            if not raw_fecha or not raw_comercio or not raw_monto:
+            if not raw_monto or raw_monto in {"-", "—", "0.00", "0"}:
+                raw_pen = normalizada.get("monto_pen", "")
+                raw_usd = normalizada.get("monto_usd", "")
+                if raw_pen and raw_pen not in {"-", "—"}:
+                    raw_monto = raw_pen
+                    if not raw_moneda and not any(t in raw_pen.upper() for t in ("USD", "US$", "$", "EUR", "€")):
+                        raw_moneda = "PEN"
+                elif raw_usd and raw_usd not in {"-", "—"}:
+                    raw_monto = raw_usd
+                    if not raw_moneda and not any(t in raw_usd.upper() for t in ("EUR", "€", "PEN", "S/")):
+                        raw_moneda = "USD"
+
+            if not raw_fecha or not raw_comercio or not raw_monto or raw_monto in {"-", "—"}:
                 continue
 
-            # Descarta filas de encabezado repetido o totales dentro de tablas PDF.
-            if raw_fecha.lower() in {"fecha", "date"} or "total" in raw_comercio.lower():
+            comercio_low = _sin_tildes(raw_comercio).lower()
+            # Descarta filas de encabezado repetido, saldos, totales o abonos dentro de tablas PDF.
+            if (
+                _sin_tildes(raw_fecha).lower() in {"fecha", "date", "fecha op.", "fecha oper."}
+                or "total" in comercio_low
+                or any(p in comercio_low for p in _FILAS_NO_GASTO)
+            ):
                 continue
 
             try:
-                monto, moneda = _parsear_monto_y_moneda(raw_monto, normalizada.get("moneda", ""))
+                monto, moneda = _parsear_monto_y_moneda(raw_monto, raw_moneda)
             except ValueError:
                 continue
 
@@ -252,16 +386,28 @@ class LectorEstadoCuenta(ABC):
 
             fecha, hora = _normalizar_fecha_y_hora(raw_fecha, normalizada.get("hora", ""))
             tx_id = normalizada.get("id") or f"TX{contador:03d}"
-            ciudad = normalizada.get("ciudad") or ciudad_default
-            canal = _inferir_canal(normalizada.get("canal", ""), raw_comercio)
+
+            raw_ciudad = normalizada.get("ciudad", "")
+            raw_canal = normalizada.get("canal", "")
+            raw_combinado = normalizada.get("lugar_canal", "")
+            if raw_combinado and (not raw_ciudad or not raw_canal):
+                ciudad_ext, canal_ext = _extraer_ciudad_y_canal(raw_combinado, ciudad_default)
+                if not raw_ciudad:
+                    raw_ciudad = ciudad_ext
+                if not raw_canal:
+                    raw_canal = canal_ext
+
+            ciudad = raw_ciudad or ciudad_default
+            canal = _inferir_canal(raw_canal, raw_comercio)
             tipo = _inferir_tipo(normalizada.get("tipo", ""), raw_comercio)
+            comercio_limpio = _limpiar_comercio_glosa(raw_comercio)
 
             movimientos.append(
                 crear_movimiento(
                     id=tx_id,
                     fecha=fecha,
                     hora=hora,
-                    comercio=raw_comercio,
+                    comercio=comercio_limpio,
                     ciudad=ciudad,
                     canal=canal,
                     monto=monto,

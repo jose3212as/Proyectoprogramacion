@@ -212,6 +212,24 @@ def obtener_auditoria(
     return auditoria
 
 
+@app.delete("/api/auditorias/{audit_id}")
+def eliminar_auditoria(
+    audit_id: str,
+    usuario: UsuarioInfo | None = Depends(obtener_usuario_opcional),
+    servicio: ServicioAuditorFinGuard = Depends(obtener_servicio),
+) -> dict[str, str | bool]:
+    if usuario is None:
+        raise HTTPException(
+            status_code=401, detail="Inicia sesión para eliminar revisiones de tu historial."
+        )
+    eliminada = servicio.repositorio.eliminar_auditoria(
+        audit_id, usuario_id=usuario.usuario_id
+    )
+    if not eliminada:
+        raise HTTPException(status_code=404, detail="Revisión no encontrada en tu historial.")
+    return {"eliminada": True, "audit_id": audit_id}
+
+
 @app.post("/api/alertas/{alerta_id}/marcar-fui-yo", response_model=MarcarFuiYoResponse)
 def marcar_alerta_fui_yo(
     alerta_id: str,

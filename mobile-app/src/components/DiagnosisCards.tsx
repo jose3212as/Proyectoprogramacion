@@ -188,14 +188,12 @@ export function DiagnosisCards({ auditoria, onMarcarFuiYo }: Props) {
           })}
         </View>
 
-        {auditoria.audit_id !== "mobile-demo-offline" && (
-          <Pressable
-            onPress={() => Linking.openURL(urlReportePdfMobile(auditoria.audit_id))}
-            className="mt-4 items-center rounded-xl bg-slate-900 py-3"
-          >
-            <Text className="text-xs font-bold text-white">Descargar Reporte PDF Bancario</Text>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={() => Linking.openURL(urlReportePdfMobile(auditoria.audit_id))}
+          className="mt-4 items-center rounded-xl bg-slate-900 py-3"
+        >
+          <Text className="text-xs font-bold text-white">Descargar Reporte PDF Bancario</Text>
+        </Pressable>
       </View>
     </View>
   );

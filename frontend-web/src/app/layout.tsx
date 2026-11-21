@@ -19,7 +19,7 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "FinGuard | Finanzas Personales y Escudo Antifraude",
   description:
-    "Auditoría inteligente y privada de estados de cuenta bancarios en PDF y CSV mediante Programación Funcional, SWI-Prolog y Ciencia de Datos.",
+    "Revisa tu estado de cuenta mensual en PDF o CSV, detecta gastos invisibles y protege tu tarjeta sin compartir tus claves bancarias.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
